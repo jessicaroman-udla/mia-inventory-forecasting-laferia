@@ -61,6 +61,7 @@ Diseñar e implementar un sistema de gestión de inventarios con modelos de fore
 
 ### DevOps & Herramientas
 - **Git / GitHub** — Control de versiones
+- **Fabric** — Automatización de deploy y ejecución del pipeline en el servidor (`fabfile.py`)
 - **Sphinx** — Documentación técnica
 
 ---
@@ -264,6 +265,41 @@ Puede ajustar estos parámetros directamente en cada script:
 
 ---
 
+## 🚢 Despliegue y ejecución remota (Fabric)
+
+Correr `train_forecasting_tiered.py` sobre el catálogo completo conviene hacerlo en un servidor (no en la laptop), y repetir a mano los pasos de SSH + `tmux` cada vez es tedioso. `fabfile.py` automatiza ese flujo desde la máquina local.
+
+### Requisitos previos
+
+- Autenticación SSH por llave hacia el servidor, configurada una sola vez (`ssh-keygen` + `ssh-copy-id`), para no tener que escribir contraseña en cada comando.
+- `pip install fabric` en su máquina local (ya está en `requirements.txt`).
+- Editar las variables al inicio de `fabfile.py` (`HOST`, `PORT`, `USER`, `SSH_KEY`, `PROJECT_DIR`) con los datos reales del servidor. El repositorio debe existir previamente en `PROJECT_DIR` del servidor, con su propio `venv` y su propio `.env` (ver [Paso 4](#paso-4--configurar-la-conexión-a-su-base-de-datos)).
+
+### Comandos disponibles
+
+Ejecútelos desde la raíz del proyecto, en su máquina local:
+
+| Comando | Qué hace |
+|---|---|
+| `fab deploy` | `git pull` + `pip install -r requirements.txt` en el servidor |
+| `fab extract` | Corre `extract_data.py` en el servidor (regenera `parsed.json` y `abc_classification.json`) |
+| `fab train` | Lanza `train_forecasting_tiered.py` dentro de una sesión `tmux` en background; si ya hay una corriendo, no la duplica |
+| `fab status` | Muestra si el entrenamiento sigue activo y las últimas 30 líneas de `training.log` |
+| `fab attach` | Se conecta en vivo a la sesión `tmux` para ver el progreso (`Ctrl+B`, luego `D` para salir sin matar el proceso) |
+| `fab stop` | Detiene la sesión de entrenamiento |
+
+Flujo típico de una corrida completa en el servidor:
+
+```bash
+fab deploy       # trae el código más reciente e instala dependencias nuevas
+fab extract      # regenera los datos de entrada
+fab train        # lanza el entrenamiento en background (tmux)
+fab status        # repetir cada tanto para chequear progreso
+fab attach        # opcional, para ver el log en vivo
+```
+
+---
+
 ## 📁 Estructura del proyecto (actual)
 
 ```
@@ -287,6 +323,7 @@ mia-inventory-forecasting-laferia/
 │   └── parsed.json                    # Series semanales por producto categoría A+B
 │
 ├── prototipo_comercial_la_feria.ipynb # Notebook equivalente, para correr en Colab
+├── fabfile.py                         # Automatiza deploy + ejecución del pipeline en el servidor (Fabric)
 ├── requirements.txt
 ├── .env.example                       # Plantilla de variables de entorno (sin datos reales)
 ├── .gitignore

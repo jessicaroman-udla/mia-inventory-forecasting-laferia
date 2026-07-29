@@ -1,4 +1,4 @@
-  """
+"""
 Entrenamiento de forecasting con tratamiento diferenciado por categoria ABC.
 Proyecto: Sistema inteligente de gestion de inventarios - Comercial La Feria
 

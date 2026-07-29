@@ -93,7 +93,7 @@ Diseñar e implementar un sistema de gestión de inventarios con modelos de fore
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                   Django Web Application                    │
-│   Dashboard │ Alertas │ Recomendaciones │ Reportes │ UAT   │
+│   Dashboard │ Alertas │ Recomendaciones │ Reportes │ UAT    │
 └─────────────────────────────────────────────────────────────┘
 ```
 

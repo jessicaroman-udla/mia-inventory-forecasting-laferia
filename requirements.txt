@@ -9,3 +9,4 @@ prophet
 tensorflow-cpu
 pulp
 deap
+fabric

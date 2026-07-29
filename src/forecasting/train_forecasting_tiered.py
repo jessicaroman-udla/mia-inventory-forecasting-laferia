@@ -39,6 +39,10 @@ from multiprocessing import Pool, cpu_count
 
 import numpy as np
 import pandas as pd
+import logging
+
+logging.getLogger("cmdstanpy").setLevel(logging.ERROR)
+logging.getLogger("prophet").setLevel(logging.ERROR)
 
 warnings.filterwarnings("ignore")
 
@@ -291,7 +295,7 @@ def main():
                     elapsed = time.time() - t0
                     mp = row.get("best_mape", float("nan"))
                     print(f"  [{i}/{len(pending_A)}] {row['product_code']} -> {row.get('selected_model')} "
-                          f"(MAPE={mp:.1f}%)  |  {elapsed/60:.1f} min transcurridos")
+                          f"(MAPE={mp:.1f}%)  |  {elapsed / 60:.1f} min transcurridos")
 
     # --- Categoria B: metodo liviano, en paralelo ---
     if pending_B:
@@ -304,7 +308,7 @@ def main():
                 if i % 200 == 0 or i == len(pending_B):
                     elapsed = time.time() - t0
                     mp = row.get("best_mape", float("nan"))
-                    print(f"  [{i}/{len(pending_B)}] MAPE={mp:.1f}%  |  {elapsed/60:.1f} min transcurridos")
+                    print(f"  [{i}/{len(pending_B)}] MAPE={mp:.1f}%  |  {elapsed / 60:.1f} min transcurridos")
 
     print("\n================ RESUMEN ================")
     if RESULTS_A_PATH.exists():

@@ -78,7 +78,7 @@ def train(c):
     with conn.cd(PROJECT_DIR):
         cmd = (
             f"tmux new-session -d -s {TMUX_SESSION} "
-            f"\"{VENV_ACTIVATE} && python src/forecasting/train_forecasting_tiered.py "
+            f"\"{VENV_ACTIVATE} && python -u src/forecasting/train_forecasting_tiered.py "
             f"2>&1 | tee {LOG_FILE}\""
         )
         conn.run(cmd)
@@ -87,7 +87,7 @@ def train(c):
 
 @task
 def status(c):
-    """Muestra si el entrenamiento sigue corriendo y las ultimas lineas del log."""
+    """Muestra si el entrenamiento sigue corriendo y las ultimas lineas relevantes del log."""
     conn = get_connection()
     result = conn.run(f"tmux has-session -t {TMUX_SESSION}", warn=True, hide=True)
     if result.ok:
@@ -96,7 +96,7 @@ def status(c):
         print(f"[NO ACTIVA] No hay una sesion '{TMUX_SESSION}' corriendo (termino o no se ha lanzado).\n")
 
     with conn.cd(PROJECT_DIR):
-        conn.run(f"tail -n 30 {LOG_FILE}", warn=True)
+        conn.run(f"tail -n 20 {LOG_FILE}", warn=True)
 
 
 @task

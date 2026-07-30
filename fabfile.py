@@ -19,6 +19,7 @@ USO (desde tu maquina local, parado en la carpeta del proyecto):
     fab stop        # detiene la sesion de entrenamiento
 """
 import os
+
 from fabric import Connection, task
 
 # =================================================================
@@ -27,11 +28,13 @@ from fabric import Connection, task
 HOST = "186.4.222.67"
 PORT = 12980
 USER = "udla"
-SSH_KEY = os.path.expanduser("~/.ssh/id_ed25519_github_udla")   # ajusta si tu llave tiene otro nombre/ruta
+SSH_KEY = os.path.expanduser("~/.ssh/id_ed25519_github_udla")  # ajusta si tu llave tiene otro nombre/ruta
 PROJECT_DIR = "~/mia-inventory-forecasting-laferia"
 VENV_ACTIVATE = f"source {PROJECT_DIR}/venv/bin/activate"
 TMUX_SESSION = "forecasting"
 LOG_FILE = f"{PROJECT_DIR}/training.log"
+
+
 # =================================================================
 
 
@@ -84,21 +87,6 @@ def train(c):
         conn.run(cmd)
     print(f"Entrenamiento lanzado en tmux (sesion '{TMUX_SESSION}'). Usa 'fab status' para ver el progreso.")
 
-@task
-def validate_b(c):
-    conn = get_connection()
-    existing = conn.run(f"tmux has-session -t validate_b", warn=True, hide=True)
-    if existing.ok:
-        print("Ya existe una sesion 'validate_b' corriendo.")
-        return
-    with conn.cd(PROJECT_DIR):
-        cmd = (
-            f"tmux new-session -d -s validate_b "
-            f"\"{VENV_ACTIVATE} && python -u src/forecasting/validate_b_sample.py "
-            f"2>&1 | tee validate_b.log\""
-        )
-        conn.run(cmd)
-    print("Validacion lanzada en tmux (sesion 'validate_b').")
 
 @task
 def status(c):
@@ -131,3 +119,35 @@ def stop(c):
     conn = get_connection()
     conn.run(f"tmux kill-session -t {TMUX_SESSION}", warn=True)
     print("Sesion detenida.")
+
+
+@task
+def validate_b(c):
+    """Corre la comparacion completa de modelos sobre una muestra de categoria B, en tmux."""
+    conn = get_connection()
+    existing = conn.run(f"tmux has-session -t validate_b", warn=True, hide=True)
+    if existing.ok:
+        print("Ya existe una sesion 'validate_b' corriendo.")
+        return
+    with conn.cd(PROJECT_DIR):
+        cmd = (
+            f"tmux new-session -d -s validate_b "
+            f"\"{VENV_ACTIVATE} && python -u src/forecasting/validate_b_sample.py "
+            f"2>&1 | tee validate_b.log\""
+        )
+        conn.run(cmd)
+    print("Validacion lanzada en tmux (sesion 'validate_b').")
+
+
+@task
+def status_validate_b(c):
+    """Muestra si el entrenamiento sigue corriendo y las ultimas lineas relevantes del log."""
+    conn = get_connection()
+    result = conn.run(f"tmux has-session -t validate_b", warn=True, hide=True)
+    if result.ok:
+        print(f"[EN CURSO] La sesion 'validate_b' sigue activa.\n")
+    else:
+        print(f"[NO ACTIVA] No hay una sesion 'validate_b' corriendo (termino o no se ha lanzado).\n")
+
+    with conn.cd(PROJECT_DIR):
+        conn.run(f"grep -v 'cmdstanpy' validate_b.log | tail -n 20", warn=True)

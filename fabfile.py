@@ -84,6 +84,21 @@ def train(c):
         conn.run(cmd)
     print(f"Entrenamiento lanzado en tmux (sesion '{TMUX_SESSION}'). Usa 'fab status' para ver el progreso.")
 
+@task
+def validate_b(c):
+    conn = get_connection()
+    existing = conn.run(f"tmux has-session -t validate_b", warn=True, hide=True)
+    if existing.ok:
+        print("Ya existe una sesion 'validate_b' corriendo.")
+        return
+    with conn.cd(PROJECT_DIR):
+        cmd = (
+            f"tmux new-session -d -s validate_b "
+            f"\"{VENV_ACTIVATE} && python -u src/forecasting/validate_b_sample.py "
+            f"2>&1 | tee validate_b.log\""
+        )
+        conn.run(cmd)
+    print("Validacion lanzada en tmux (sesion 'validate_b').")
 
 @task
 def status(c):
@@ -96,7 +111,7 @@ def status(c):
         print(f"[NO ACTIVA] No hay una sesion '{TMUX_SESSION}' corriendo (termino o no se ha lanzado).\n")
 
     with conn.cd(PROJECT_DIR):
-        conn.run(f"tail -n 20 {LOG_FILE}", warn=True)
+        conn.run(f"grep -v 'cmdstanpy' {LOG_FILE} | tail -n 20", warn=True)
 
 
 @task

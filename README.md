@@ -101,6 +101,40 @@ Los dos módulos de la mitad (Forecasting y Optimización) son lo que existe hoy
 
 ---
 
+## 🧹 Preprocesamiento y tratamiento de datos
+
+El preprocesamiento se ejecuta como parte de `extract_data.py` y de la carga inicial de `train_forecasting.py` / `train_forecasting_tiered.py`, antes de entrenar cualquier modelo:
+
+- **Consolidación y normalización.** Unificación de códigos de producto entre sucursales, normalización de unidades de medida y construcción de la serie de tiempo semanal por producto.
+- **Tratamiento de vacíos.** Los días/semanas sin venta se rellenan explícitamente con cero (demanda nula, no dato faltante), diferenciándolos de huecos por cierre o incidencia operativa.
+- **Detección de atípicos.** Picos por ventas mayoristas puntuales o promociones se identifican mediante rango intercuartílico (ver también `diagnostico_series.py`, que expone el detalle por producto).
+- **Corrección por quiebre de stock (demanda censurada).** Los períodos con existencia cero se tratan como demanda censurada: la venta observada subestima la demanda real. Sin esta corrección, los modelos aprenderían a reproducir las propias rupturas de stock que el sistema busca eliminar.
+- **Clasificación ABC dinámica.** Categorización por rotación, margen y criticidad (método Pareto 80/95% de valor acumulado), ejecutada en `extract_data.py` (`ABC_THRESHOLD_A`, `ABC_THRESHOLD_B`).
+- **Partición temporal.** División cronológica en entrenamiento/prueba (`TEST_WEEKS`, 12 semanas por defecto), sin mezcla aleatoria, para preservar el orden temporal.
+- **Escalado.** Normalización min-max de las series para el LSTM, con reversión del escalado al generar las predicciones.
+
+### Privacidad y anonimización
+
+Los datos provienen de `inventario.ventas` en PostgreSQL (alimentado desde SAP Business One HANA) y corresponden a operaciones B2B y de inventario interno, sujetas a la Ley Orgánica de Protección de Datos Personales (LOPDP) de Ecuador. El pipeline aplica:
+
+- **Minimización de datos**: solo se extraen los campos necesarios para forecasting y optimización (código de producto, cantidad, fecha, sucursal) — no se descargan datos de contacto ni identificadores personales de clientes.
+- **Control de acceso**: las credenciales de conexión viven exclusivamente en `.env` (excluido de Git vía `.gitignore`); el acceso a los JSON/CSV de resultados está restringido al equipo del proyecto (ver sección "🔒 Privacidad y Datos" más abajo).
+- **Sin escritura de vuelta al ERP**: el sistema únicamente lee de SAP HANA; no existe riesgo de alterar datos de producción del ERP desde este repositorio.
+
+---
+
+## 🔍 Explicabilidad de los modelos
+
+Además de las métricas de error (MAE/RMSE/MAPE), el proyecto documenta **por qué** cada modelo llega a su resultado:
+
+- **ARIMA y Prophet** son intrínsecamente explicables: el orden `(p,d,q)(P,D,Q)m` de ARIMA y la descomposición tendencia/estacionalidad de Prophet ya exponen su lógica de decisión sin herramientas externas.
+- **Holt-Winters** se explica mediante sus parámetros de suavizado (alpha=nivel, beta=tendencia, gamma=estacionalidad).
+- **LSTM**, al ser una red neuronal, requiere una herramienta externa: se usa **SHAP** (`GradientExplainer`) para estimar qué semanas pasadas (dentro de la ventana de 8 semanas de entrada) pesan más en cada predicción.
+
+Ver `explain_shap_lstm.py` y `explain_intrinsic.py` en la tabla de módulos arriba. Los model cards resultantes (resumen de 1 página por estrategia, con limitaciones y riesgos éticos identificados) se documentan en el capstone, sección 7.3.
+
+---
+
 ## ✅ Estado actual del prototipo
 
 El prototipo ejecutable de este repositorio cubre el flujo de datos → forecasting → optimización descrito en la Sección 7.2 del documento capstone, organizado en tres módulos dentro de `src/`:
@@ -112,6 +146,11 @@ El prototipo ejecutable de este repositorio cubre el flujo de datos → forecast
 | `src/forecasting/` | `train_forecasting_tiered.py` | Versión pensada para servidor: paraleliza por producto (`multiprocessing`) y hace checkpointing incremental. Aplica comparación completa ARIMA/Prophet/LSTM solo a categoría A, y suavizado exponencial (Holt-Winters) —más liviano— a categoría B, para poder cubrir miles de productos | `model_comparison_results_A.csv`, `model_comparison_results_B.csv`, `prediction_details_A.jsonl` |
 | `src/forecasting/` | `diagnostico_series.py` | Diagnóstico de los productos con MAPE más alto: gráfico de la serie, % de semanas en cero, coeficiente de variación, outliers (regla IQR) y comparación train vs. test / real vs. predicho | Carpeta `diagnostico_output/` con `.png` y 2 CSV de resumen |
 | `src/forecasting/` | `generate_charts.py` | Genera los gráficos de comparación de modelos (a partir de `model_comparison_results.csv`) | 3 archivos `.png` |
+| `src/forecasting/` | `explain_shap_lstm.py` | Explicabilidad post-hoc del LSTM (SHAP GradientExplainer): qué semanas pasadas (t-1...t-8) pesan más en la predicción, para una muestra de productos donde LSTM fue el modelo ganador | `shap_lstm_results.json`, carpeta `shap_output/` |
+| `src/forecasting/` | `explain_intrinsic.py` | Explicabilidad intrínseca de ARIMA (orden p,d,q), Prophet (descomposición tendencia/estacionalidad) y Holt-Winters (parámetros de suavizado alpha/beta/gamma), para una muestra de productos de categoría A o B | `intrinsic_explanations.json`, carpeta `intrinsic_output/` |
+| `src/forecasting/` | `validate_b_sample.py` | Valida empíricamente la estrategia diferenciada A/B: corre la comparación completa de 3 modelos sobre una muestra estadísticamente representativa (n=349, 95% confianza, 5% margen) de categoría B, para contrastar contra Holt-Winters | `model_comparison_results_B_sample.csv`, `prediction_details_B_sample.jsonl` |
+| `src/forecasting/` | `compare_b_significance.py` | Prueba de significancia estadística (Wilcoxon signed-rank) entre la comparación completa y Holt-Winters, sobre los productos coincidentes de la muestra anterior | `b_significance_comparison.csv` (consola) |
+| `src/forecasting/` | `summarize_final_results.py` | Recalcula mediana, media y percentiles de MAPE sobre los resultados finales de A y B (la mediana, no la media, es la métrica de reporte correcta dado el sesgo por outliers de demanda intermitente) | consola |
 | `src/optimization/` | `milp_reorder.py` | Optimizador MILP (PuLP): punto de reorden y cantidad óptima de pedido | `resultado_milp_reorden.json` |
 | `src/optimization/` | `ga_transfers.py` | Algoritmo genético (DEAP): balanceo de transferencias entre sucursales | `resultado_ga_transferencias.json` |
 | `src/optimization/` | `generate_optimization_charts.py` | Genera los gráficos del MILP y del algoritmo genético | 2 archivos `.png` |

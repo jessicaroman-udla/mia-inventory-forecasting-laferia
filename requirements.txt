@@ -10,3 +10,4 @@ tensorflow-cpu
 pulp
 deap
 fabric
+shap

@@ -151,3 +151,49 @@ def status_validate_b(c):
 
     with conn.cd(PROJECT_DIR):
         conn.run(f"grep -v 'cmdstanpy' validate_b.log | tail -n 20", warn=True)
+
+
+@task
+def explain_shap(c, n=15, codigos=None):
+    """
+    Corre explain_shap_lstm.py en el servidor, dentro de tmux.
+    Uso:
+        fab explain-shap                    # top 15 productos LSTM por mejor MAPE
+        fab explain-shap:n=25                # top 25
+        fab explain-shap:codigos=COD001,COD002   # productos especificos
+    """
+    conn = get_connection()
+    session = "explain_shap"
+    existing = conn.run(f"tmux has-session -t {session}", warn=True, hide=True)
+    if existing.ok:
+        print(f"Ya existe una sesion tmux '{session}' corriendo. Usa 'fab status-explain-shap'.")
+        return
+
+    if codigos:
+        extra_args = f"--codigos {codigos}"
+    else:
+        extra_args = f"--n-productos {n}"
+
+    with conn.cd(PROJECT_DIR):
+        cmd = (
+            f"tmux new-session -d -s {session} "
+            f"\"{VENV_ACTIVATE} && python -u src/forecasting/explain_shap_lstm.py {extra_args} "
+            f"2>&1 | tee shap_lstm.log\""
+        )
+        conn.run(cmd)
+    print(f"SHAP sobre LSTM lanzado en tmux (sesion '{session}'). Usa 'fab status-explain-shap' para ver el progreso.")
+
+
+@task
+def status_explain_shap(c):
+    """Muestra si la explicabilidad SHAP sigue corriendo y las ultimas lineas relevantes del log."""
+    conn = get_connection()
+    session = "explain_shap"
+    result = conn.run(f"tmux has-session -t {session}", warn=True, hide=True)
+    if result.ok:
+        print(f"[EN CURSO] La sesion '{session}' sigue activa.\n")
+    else:
+        print(f"[NO ACTIVA] No hay una sesion '{session}' corriendo (termino o no se ha lanzado).\n")
+
+    with conn.cd(PROJECT_DIR):
+        conn.run(f"tail -n 30 shap_lstm.log", warn=True)

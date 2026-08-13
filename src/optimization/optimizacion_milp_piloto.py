@@ -8,6 +8,7 @@ de reabastecimiento por producto-sucursal.
 Ejecutar primero sobre un subconjunto piloto (categoría A, una sucursal)
 para validar la formulación antes de escalar al catálogo completo.
 
+Autor: Jessica Roman
 """
 
 import os
@@ -41,7 +42,7 @@ USAR_CSV_PRONOSTICO = True
 RUTA_CSV_PRONOSTICO = "forecast_output.csv"  # <-- AJUSTAR a tu archivo real
 
 # Filtros del piloto: reducir alcance antes de correr sobre todo el catálogo
-PILOTO_CATEGORIA = "A"
+PILOTO_CATEGORIA = None  # None = A+B juntas; o "A"/"B" para una sola
 PILOTO_ALMACEN = None  # None = todas las sucursales; o ej. "CHOVE01" para una sola
 
 # Supuestos de negocio documentados (ver justificación en sección 7.2 de la tesis)

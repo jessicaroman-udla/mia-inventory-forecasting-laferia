@@ -78,7 +78,7 @@ def cargar_datos(engine):
         """),
         engine,
     )
-    stock["disponible"] = stock["stock"] - stock["comprometido"].fillna(0)
+    stock["disponible"] = (stock["stock"] - stock["comprometido"].fillna(0)).clip(lower=0)
 
     print("Cargando maestro de productos...")
     productos = pd.read_sql(

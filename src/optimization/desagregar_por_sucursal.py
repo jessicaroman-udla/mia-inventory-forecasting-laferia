@@ -47,6 +47,12 @@ OUTPUT_PATH = ROOT_DIR / "forecast_output.csv"
 # le asigna demanda proyectada (queda fuera del reparto, no en cero forzado).
 VENTANA_HISTORICA = "6 months"
 
+# Tope de sensatez: si el pronostico de un producto supera este multiplo de
+# su venta historica reciente (proyectada al mismo horizonte), se recorta.
+# Protege contra pronosticos que "se disparan" por inestabilidad de ARIMA/
+# Prophet en productos con historial corto o muy volatil.
+TOPE_MULTIPLICADOR = 3
+
 
 def conectar():
     conn_str = f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
@@ -71,6 +77,25 @@ def cargar_participacion_por_sucursal(engine):
     return df[["codigo_item", "almacen", "participacion"]]
 
 
+def cargar_referencia_historica(engine):
+    """Venta reciente por producto (todas las sucursales), proyectada al
+    mismo horizonte del pronostico (4 semanas), para usarla como tope de
+    sensatez: si el modelo predice muchisimo mas que esto, se recorta."""
+    df = pd.read_sql(
+        text(f"""
+            SELECT codigo_item, SUM(cantidad) AS unidades_6_meses
+            FROM {ESQUEMA_BD}.ventas
+            WHERE fecha >= CURRENT_DATE - INTERVAL '{VENTANA_HISTORICA}'
+              AND cantidad > 0
+            GROUP BY codigo_item
+        """),
+        engine,
+    )
+    semanas_historicas = 26  # ~6 meses
+    df["referencia_horizonte"] = df["unidades_6_meses"] / semanas_historicas * 4
+    return df[["codigo_item", "referencia_horizonte"]]
+
+
 def cargar_mape_por_producto():
     mape_a = pd.read_csv(RESULTS_A_PATH)[["product_code", "best_mape"]] \
         if RESULTS_A_PATH.exists() else pd.DataFrame(columns=["product_code", "best_mape"])
@@ -89,9 +114,25 @@ def main():
     pronostico = pronostico.rename(columns={"product_code": "codigo_item"})
 
     participacion = cargar_participacion_por_sucursal(engine)
+    referencia = cargar_referencia_historica(engine)
     mape = cargar_mape_por_producto()
 
     print(f"Productos con pronostico: {len(pronostico)}")
+
+    # --- Tope de sensatez sobre el pronostico nacional, ANTES de desagregar ---
+    pronostico = pronostico.merge(referencia, on="codigo_item", how="left")
+    tope = pronostico["referencia_horizonte"] * TOPE_MULTIPLICADOR
+    excede_tope = (tope.notna()) & (pronostico["demanda_pronosticada_total"] > tope)
+    n_recortados = int(excede_tope.sum())
+    if n_recortados:
+        print(f"AVISO: {n_recortados} productos con pronostico > {TOPE_MULTIPLICADOR}x su venta "
+              f"historica reciente — recortados al tope (posible inestabilidad de ARIMA/Prophet).")
+        recortados_detalle = pronostico.loc[
+            excede_tope, ["codigo_item", "demanda_pronosticada_total", "referencia_horizonte"]
+        ].copy()
+        recortados_detalle.to_csv(ROOT_DIR / "pronosticos_recortados_log.csv", index=False)
+        print(f"  Detalle guardado en pronosticos_recortados_log.csv para revision.")
+    pronostico.loc[excede_tope, "demanda_pronosticada_total"] = tope[excede_tope]
 
     df = pronostico.merge(participacion, on="codigo_item", how="inner")
     sin_participacion = set(pronostico["codigo_item"]) - set(df["codigo_item"])

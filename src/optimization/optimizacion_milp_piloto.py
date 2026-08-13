@@ -51,8 +51,13 @@ NIVEL_SERVICIO_DEFAULT = 0.95      # si no hay dato en analisis_avanzado
 Z_SCORE_95 = 1.645                 # z para 95% de nivel de servicio (normal estándar)
 
 HORIZONTE_DIAS = 30                # horizonte de planificación del piloto
+CAPACIDAD_BUFFER = 1.3             # margen de holgura sobre el stock total actual
 
 OUTPUT_CSV = "resultados_milp_piloto.csv"
+
+# --- AJUSTAR si tus tablas viven bajo otro esquema (ya vimos que ventas
+# está en 'inventario.'); confirma stock_global y productos también. ---
+ESQUEMA_BD = "inventario"
 
 # ============================================================
 # CONEXIÓN Y CARGA DE DATOS
@@ -66,9 +71,9 @@ def conectar():
 def cargar_datos(engine):
     print("Cargando stock actual...")
     stock = pd.read_sql(
-        text("""
+        text(f"""
             SELECT codigo_item, almacen, stock, comprometido
-            FROM inventario.stock_global
+            FROM {ESQUEMA_BD}.stock_global
         """),
         engine,
     )
@@ -76,22 +81,25 @@ def cargar_datos(engine):
 
     print("Cargando maestro de productos...")
     productos = pd.read_sql(
-        text("""
+        text(f"""
             SELECT item_code AS codigo_item, item_name, lead_time,
                    pur_pack_un, itms_grp_cod
-            FROM inventario.productos
+            FROM {ESQUEMA_BD}.productos
         """),
         engine,
     )
 
     print("Cargando costo unitario más reciente por producto (tabla ventas)...")
     # Se toma el costo de la venta más reciente por producto como proxy
-    # de costo de adquisición vigente.
+    # de costo de adquisición vigente. Se limita a los últimos 6 meses
+    # para evitar un sort completo sobre 3 años de histórico (evita el
+    # crash de conexión por agotamiento de memoria/disco temporal).
     costos = pd.read_sql(
-        text("""
+        text(f"""
             SELECT DISTINCT ON (codigo_item) codigo_item, costo, fecha
-            FROM inventario.ventas
+            FROM {ESQUEMA_BD}.ventas
             WHERE costo IS NOT NULL AND costo > 0
+              AND fecha >= CURRENT_DATE - INTERVAL '6 months'
             ORDER BY codigo_item, fecha DESC
         """),
         engine,
@@ -99,10 +107,13 @@ def cargar_datos(engine):
 
     print("Calculando desviación estándar histórica de ventas (respaldo de sigma)...")
     # Respaldo mientras se confirma la llave de unión con analisis_avanzado.
+    # Igual que el query de costo, se limita la ventana para evitar un
+    # agregado completo sobre 3 años de histórico.
     sigma_hist = pd.read_sql(
-        text("""
+        text(f"""
             SELECT codigo_item, almacen, STDDEV(cantidad) AS sigma_demanda
-            FROM inventario.ventas
+            FROM {ESQUEMA_BD}.ventas
+            WHERE fecha >= CURRENT_DATE - INTERVAL '6 months'
             GROUP BY codigo_item, almacen
         """),
         engine,
@@ -154,8 +165,13 @@ def construir_dataset(stock, productos, costos, sigma_hist, pronostico):
 
 
 def calcular_capacidad_sucursal(stock):
-    # Supuesto: capacidad práctica = máximo histórico de stock observado por sucursal.
-    cap = stock.groupby("almacen")["stock"].max().to_dict()
+    # Supuesto CORREGIDO: la capacidad práctica se aproxima como la suma del
+    # stock actual total por sucursal (todos los productos), con un margen
+    # de holgura del 30% — no el máximo de un solo producto individual
+    # (error anterior: eso subestimaba brutalmente la capacidad real y
+    # volvía el problema infeasible).
+    total_actual_por_sucursal = stock.groupby("almacen")["stock"].sum()
+    cap = (total_actual_por_sucursal * CAPACIDAD_BUFFER).to_dict()
     return cap
 
 

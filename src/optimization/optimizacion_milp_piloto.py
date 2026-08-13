@@ -237,15 +237,39 @@ def resolver_milp(df, capacidad_sucursal):
 
     if prob.status != 1:  # no óptimo -> diagnosticar antes de seguir
         print("\n=== DIAGNÓSTICO: problema no resuelto de forma óptima ===")
-        print("Comparando disponible actual vs. capacidad por sucursal (con x=0):")
+
+        # Pedido mínimo real que necesitaría cada producto (antes de resolver
+        # el MILP), respetando MOQ, para ver si la capacidad alcanza incluso
+        # en el escenario mínimo indispensable.
+        def pedido_minimo(row):
+            necesario = row["forecasted_demand"] + row["punto_reorden"] - row["disponible"]
+            if necesario <= 0:
+                return 0
+            return max(necesario, row["moq"])
+
+        df["_pedido_minimo_diag"] = df.apply(pedido_minimo, axis=1)
+
+        print("Comparando disponible + pedido MÍNIMO necesario vs. capacidad por sucursal:")
         for almacen, grupo in df.groupby("almacen"):
             disponible_sum = grupo["disponible"].sum()
+            minimo_sum = grupo["_pedido_minimo_diag"].sum()
+            total_necesario = disponible_sum + minimo_sum
             cap = capacidad_sucursal.get(almacen)
             if cap is None:
-                print(f"  {almacen}: disponible_sum={disponible_sum:,.0f}  capacidad=NO ENCONTRADA (almacen sin match en stock_global)")
+                print(f"  {almacen}: capacidad=NO ENCONTRADA")
                 continue
-            estado = "!!! YA EXCEDE CAPACIDAD (aun con x=0) !!!" if disponible_sum > cap else "ok"
-            print(f"  {almacen}: disponible_sum={disponible_sum:,.0f}  capacidad={cap:,.0f}  -> {estado}")
+            estado = "!!! CAPACIDAD INSUFICIENTE incluso con pedido mínimo !!!" if total_necesario > cap else "ok"
+            print(f"  {almacen}: disponible={disponible_sum:,.0f}  +pedido_minimo={minimo_sum:,.0f}  "
+                  f"= {total_necesario:,.0f}  vs  capacidad={cap:,.0f}  -> {estado}")
+
+        # Top 5 productos con mayor pedido mínimo individual, por si un solo
+        # producto atípico (MOQ o punto de reorden desproporcionado) es el culpable.
+        top5 = df.nlargest(5, "_pedido_minimo_diag")[
+            ["codigo_item", "almacen", "disponible", "forecasted_demand",
+             "punto_reorden", "moq", "_pedido_minimo_diag"]
+        ]
+        print("\nTop 5 productos con mayor pedido mínimo individual (posibles outliers):")
+        print(top5.to_string(index=False))
         print("=== FIN DIAGNÓSTICO ===\n")
 
     df["cantidad_a_ordenar"] = [int(x[i].value() or 0) for i in idx]

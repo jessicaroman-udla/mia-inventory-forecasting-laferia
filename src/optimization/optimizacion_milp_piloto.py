@@ -52,7 +52,7 @@ NIVEL_SERVICIO_DEFAULT = 0.95      # si no hay dato en analisis_avanzado
 Z_SCORE_95 = 1.645                 # z para 95% de nivel de servicio (normal estándar)
 
 HORIZONTE_DIAS = 30                # horizonte de planificación del piloto
-CAPACIDAD_BUFFER = 1.3             # margen de holgura sobre el stock total actual
+CAPACIDAD_BUFFER = 1.5             # margen de holgura sobre el stock total actual
 
 OUTPUT_CSV = "resultados_milp_piloto.csv"
 

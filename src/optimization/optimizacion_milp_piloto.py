@@ -235,6 +235,19 @@ def resolver_milp(df, capacidad_sucursal):
     print(f"Resolviendo MILP sobre {len(idx)} pares producto-sucursal...")
     prob.solve(PULP_CBC_CMD(msg=False))
 
+    if prob.status != 1:  # no óptimo -> diagnosticar antes de seguir
+        print("\n=== DIAGNÓSTICO: problema no resuelto de forma óptima ===")
+        print("Comparando disponible actual vs. capacidad por sucursal (con x=0):")
+        for almacen, grupo in df.groupby("almacen"):
+            disponible_sum = grupo["disponible"].sum()
+            cap = capacidad_sucursal.get(almacen)
+            if cap is None:
+                print(f"  {almacen}: disponible_sum={disponible_sum:,.0f}  capacidad=NO ENCONTRADA (almacen sin match en stock_global)")
+                continue
+            estado = "!!! YA EXCEDE CAPACIDAD (aun con x=0) !!!" if disponible_sum > cap else "ok"
+            print(f"  {almacen}: disponible_sum={disponible_sum:,.0f}  capacidad={cap:,.0f}  -> {estado}")
+        print("=== FIN DIAGNÓSTICO ===\n")
+
     df["cantidad_a_ordenar"] = [int(x[i].value() or 0) for i in idx]
     df["genera_orden"] = [int(y[i].value() or 0) for i in idx]
 

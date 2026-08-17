@@ -156,20 +156,30 @@ def construir_dataset(stock, productos, costos, sigma_hist, pronostico):
     df["disponible"] = df["disponible"].fillna(0)
     df["costo"] = df["costo"].fillna(df["costo"].median())
     df["sigma_demanda"] = df["sigma_demanda"].fillna(df["sigma_demanda"].median())
-    # LEAD_TIME_DEFAULT_DIAS: el campo maestro lead_time (SAP/PostgreSQL) no esta
-    # poblado a nivel de producto (99.99% en 0). No se encontro proxy confiable por
-    # grupo de producto (itms_grp_cod=IMPORTACIONES cubre solo 1.15% del catalogo,
-    # muy por debajo del 40-50% de importacion declarado por la empresa) ni por
-    # proveedor (todos son distribuidores locales, no reflejan origen de la mercancia).
-    # Se aplica un supuesto ponderado: 45% importado (75 dias) + 55% nacional (11 dias)
-    # = ~40 dias, consistente con el mix 40-50% importado declarado en la seccion 1.2.
-    LEAD_TIME_DEFAULT_DIAS = 40
+    # El campo maestro lead_time (SAP/PostgreSQL) no esta poblado a nivel de producto
+    # (99.99% en 0). No se encontro proxy confiable por proveedor (todos son
+    # distribuidores locales, no reflejan origen de la mercancia). Se usa itms_grp_cod
+    # como proxy de origen: el grupo IMPORTACIONES (110) recibe el lead time importado
+    # declarado (60-90 dias, punto medio 75); el resto del catalogo (abarrotes,
+    # alimentos basicos, mayoritariamente de produccion/distribucion nacional) recibe
+    # el lead time nacional declarado (7-15 dias, punto medio 11). Ver seccion 1.2.
+    LEAD_TIME_NACIONAL_DIAS = 11
+    LEAD_TIME_IMPORTADO_DIAS = 75
+    GRUPO_IMPORTACIONES_COD = 110
+
     n_lead_time_faltante = (df["lead_time"].isna() | (df["lead_time"] == 0)).sum()
     if n_lead_time_faltante > 0:
         print(f"AVISO: {n_lead_time_faltante} productos sin lead_time en maestro (NULL o 0) "
-              f"-- se aplico supuesto ponderado de {LEAD_TIME_DEFAULT_DIAS} dias.")
-    df["lead_time"] = df["lead_time"].replace(0, np.nan).fillna(LEAD_TIME_DEFAULT_DIAS)
-    
+              f"-- se aplico supuesto por grupo: {LEAD_TIME_IMPORTADO_DIAS} dias para "
+              f"IMPORTACIONES (grupo {GRUPO_IMPORTACIONES_COD}), {LEAD_TIME_NACIONAL_DIAS} "
+              f"dias para el resto del catalogo.")
+
+    df["lead_time"] = df["lead_time"].replace(0, np.nan)
+    lead_time_defecto = df["itms_grp_cod"].apply(
+        lambda g: LEAD_TIME_IMPORTADO_DIAS if g == GRUPO_IMPORTACIONES_COD else LEAD_TIME_NACIONAL_DIAS
+    )
+    df["lead_time"] = df["lead_time"].fillna(lead_time_defecto)
+
     df["moq"] = df["pur_pack_un"].fillna(1).clip(lower=1)
 
     df["holding_cost"] = df["costo"] * HOLDING_COST_ANUAL_PCT / 365 * HORIZONTE_DIAS

@@ -184,6 +184,17 @@ def construir_dataset(stock, productos, costos, sigma_hist, pronostico):
 
     df["holding_cost"] = df["costo"] * HOLDING_COST_ANUAL_PCT / 365 * HORIZONTE_DIAS
 
+    # Exclusion de productos GRANEL: se venden por libra/peso mientras que buy_unit_msr
+    # los registra como "UN", generando demandas semanales 100-1000x mayores a productos
+    # normales y puntos de reorden que exceden la capacidad de bodega (validado: excluirlos
+    # resuelve la infactibilidad de capacidad en las 4 sucursales, incluyendo CHOVE01).
+    # Tratamiento de unidades de venta a granel queda como linea de trabajo futuro.
+    n_granel = df["item_name"].str.contains("GRANEL", case=False, na=False).sum()
+    if n_granel > 0:
+        print(f"AVISO: {n_granel} pares producto-sucursal excluidos por venta a granel "
+              f"(unidad de medida UN no representa correctamente el volumen vendido).")
+    df = df[~df["item_name"].str.contains("GRANEL", case=False, na=False)]
+
     df = df.dropna(subset=["forecasted_demand", "codigo_item", "almacen"])
     return df.reset_index(drop=True)
 

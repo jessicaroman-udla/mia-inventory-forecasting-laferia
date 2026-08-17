@@ -156,7 +156,20 @@ def construir_dataset(stock, productos, costos, sigma_hist, pronostico):
     df["disponible"] = df["disponible"].fillna(0)
     df["costo"] = df["costo"].fillna(df["costo"].median())
     df["sigma_demanda"] = df["sigma_demanda"].fillna(df["sigma_demanda"].median())
-    df["lead_time"] = df["lead_time"].fillna(df["lead_time"].median())
+    # LEAD_TIME_DEFAULT_DIAS: el campo maestro lead_time (SAP/PostgreSQL) no esta
+    # poblado a nivel de producto (99.99% en 0). No se encontro proxy confiable por
+    # grupo de producto (itms_grp_cod=IMPORTACIONES cubre solo 1.15% del catalogo,
+    # muy por debajo del 40-50% de importacion declarado por la empresa) ni por
+    # proveedor (todos son distribuidores locales, no reflejan origen de la mercancia).
+    # Se aplica un supuesto ponderado: 45% importado (75 dias) + 55% nacional (11 dias)
+    # = ~40 dias, consistente con el mix 40-50% importado declarado en la seccion 1.2.
+    LEAD_TIME_DEFAULT_DIAS = 40
+    n_lead_time_faltante = (df["lead_time"].isna() | (df["lead_time"] == 0)).sum()
+    if n_lead_time_faltante > 0:
+        print(f"AVISO: {n_lead_time_faltante} productos sin lead_time en maestro (NULL o 0) "
+              f"-- se aplico supuesto ponderado de {LEAD_TIME_DEFAULT_DIAS} dias.")
+    df["lead_time"] = df["lead_time"].replace(0, np.nan).fillna(LEAD_TIME_DEFAULT_DIAS)
+    
     df["moq"] = df["pur_pack_un"].fillna(1).clip(lower=1)
 
     df["holding_cost"] = df["costo"] * HOLDING_COST_ANUAL_PCT / 365 * HORIZONTE_DIAS

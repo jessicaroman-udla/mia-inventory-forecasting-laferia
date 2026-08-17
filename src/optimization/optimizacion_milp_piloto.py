@@ -156,6 +156,18 @@ def construir_dataset(stock, productos, costos, sigma_hist, pronostico):
     df["disponible"] = df["disponible"].fillna(0)
     df["costo"] = df["costo"].fillna(df["costo"].median())
     df["sigma_demanda"] = df["sigma_demanda"].fillna(df["sigma_demanda"].median())
+    # Winsorizing de sigma_demanda: la desviacion estandar historica esta fuertemente
+    # sesgada por ventas puntuales de alto volumen (posible B2B) en un subconjunto
+    # pequeño de productos, ver ejemplo A111033-0006 (sigma=3434 vs mediana=0.66,
+    # ROP resultante 9.7x superior a la demanda pronosticada). Se capa en el
+    # percentil 99 para evitar que esos outliers distorsionen el stock de seguridad.
+    p99_sigma = df["sigma_demanda"].quantile(0.99)
+    n_capados = (df["sigma_demanda"] > p99_sigma).sum()
+    if n_capados > 0:
+        print(f"AVISO: {n_capados} pares producto-sucursal con sigma_demanda por encima "
+              f"del percentil 99 ({p99_sigma:.2f}) -- capados a ese valor.")
+    df["sigma_demanda"] = df["sigma_demanda"].clip(upper=p99_sigma)
+    
     # El campo maestro lead_time (SAP/PostgreSQL) no esta poblado a nivel de producto
     # (99.99% en 0). No se encontro proxy confiable por proveedor (todos son
     # distribuidores locales, no reflejan origen de la mercancia). Se usa itms_grp_cod

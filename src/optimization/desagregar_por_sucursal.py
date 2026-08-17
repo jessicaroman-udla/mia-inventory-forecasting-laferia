@@ -111,6 +111,16 @@ def main():
 
     pronostico = pd.read_csv(PRONOSTICO_PRODUCTO_PATH)
     pronostico = pronostico[pronostico["status"] == "OK"].copy()
+    
+    # Exclusion de productos GRANEL: se venden por libra/peso mientras que buy_unit_msr
+    # los registra como "UN", generando demandas 100-1000x mayores a productos normales
+    # (ver optimizacion_milp_piloto.py, misma exclusion aplicada por consistencia entre
+    # etapas). Tratamiento de unidades a granel queda como linea de trabajo futuro.
+    n_granel = pronostico["product_name"].str.contains("GRANEL", case=False, na=False).sum()
+    if n_granel > 0:
+        print(f"AVISO: {n_granel} productos excluidos por venta a granel (unidad de "
+              f"medida UN no representa correctamente el volumen vendido).")
+    pronostico = pronostico[~pronostico["product_name"].str.contains("GRANEL", case=False, na=False)]
     pronostico = pronostico.rename(columns={"product_code": "codigo_item"})
 
     participacion = cargar_participacion_por_sucursal(engine)

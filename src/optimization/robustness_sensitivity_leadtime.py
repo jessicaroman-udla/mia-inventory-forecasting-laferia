@@ -34,6 +34,14 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import optimizacion_milp_piloto as milp  # noqa: E402  (reutiliza el modulo real del pipeline)
 
+# optimizacion_milp_piloto.py referencia sus CSV de entrada (forecast_output.csv,
+# etc.) con rutas relativas al directorio raiz del repo (donde normalmente se
+# ejecuta el pipeline). Este script vive en src/optimization/, asi que se
+# corrigen esas rutas para que apunten a la raiz del repo sin importar desde
+# donde se invoque este archivo.
+_ROOT_DIR = Path(__file__).resolve().parents[2]
+milp.RUTA_CSV_PRONOSTICO = str(_ROOT_DIR / "forecast_output.csv")
+
 # ============================================================
 # CONFIGURACION DE LA PRUEBA
 # ============================================================

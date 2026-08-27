@@ -47,6 +47,8 @@ import psycopg2
 from dotenv import load_dotenv
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
+DATA_DIR = ROOT_DIR / "data"
+DATA_DIR.mkdir(exist_ok=True)
 
 # Carga las variables del archivo .env ubicado en la raiz del proyecto
 load_dotenv(ROOT_DIR / ".env")
@@ -235,7 +237,7 @@ def main():
         print(f"  Total productos clasificados: {len(classification)}")
         print(f"  Categoria A: {counts['A']}  |  Categoria B: {counts['B']}  |  Categoria C: {counts['C']}")
 
-        with open(ROOT_DIR / "data" / "abc_classification.json", "w", encoding="utf-8") as f:
+        with open(DATA_DIR / "abc_classification.json", "w", encoding="utf-8") as f:
             json.dump({
                 "ranking_start_date": RANKING_START_DATE,
                 "threshold_a": ABC_THRESHOLD_A,
@@ -260,17 +262,17 @@ def main():
                 for p in top
             ],
         }
-        with open(ROOT_DIR / "data" / "parsed.json", "w", encoding="utf-8") as f:
+        with open(DATA_DIR / "parsed.json", "w", encoding="utf-8") as f:
             json.dump(parsed, f, ensure_ascii=False, indent=2)
 
         print("Extracting current stock by warehouse...")
         stock = get_stock(conn, codes)
-        with open(ROOT_DIR / "stock_data.json", "w", encoding="utf-8") as f:
+        with open(DATA_DIR / "stock_data.json", "w", encoding="utf-8") as f:
             json.dump(stock, f, ensure_ascii=False, indent=2)
 
         print("Extracting average prices...")
         prices = get_prices(conn, codes)
-        with open(ROOT_DIR / "prices.json", "w", encoding="utf-8") as f:
+        with open(DATA_DIR / "prices.json", "w", encoding="utf-8") as f:
             json.dump(prices, f, ensure_ascii=False, indent=2)
 
         print("Computing demand statistics (weekly mean/std dev)...")
@@ -284,27 +286,27 @@ def main():
                 "weekly_mean": mean,
                 "weekly_std": variance ** 0.5,
             }
-        with open(ROOT_DIR / "demand_statistics.json", "w", encoding="utf-8") as f:
+        with open(DATA_DIR / "demand_statistics.json", "w", encoding="utf-8") as f:
             json.dump(stats, f, ensure_ascii=False, indent=2)
 
         print("Extracting sales by warehouse (for the genetic algorithm)...")
         sales_by_warehouse = get_sales_by_warehouse(conn, codes)
-        with open(ROOT_DIR / "warehouse_sale.json", "w", encoding="utf-8") as f:
+        with open(DATA_DIR / "warehouse_sale.json", "w", encoding="utf-8") as f:
             json.dump(sales_by_warehouse, f, ensure_ascii=False, indent=2)
 
         print("Extracting warehouse configuration and transfer routes...")
         warehouses = get_warehouses(conn)
-        with open(ROOT_DIR / "warehouses.json", "w", encoding="utf-8") as f:
+        with open(DATA_DIR / "warehouses.json", "w", encoding="utf-8") as f:
             json.dump(warehouses, f, ensure_ascii=False, indent=2)
 
-        print("\nDone. Generated files:")
+        print("\nDone. Archivos generados en data/:")
         print("  data/abc_classification.json  (clasificacion ABC completa del catalogo)")
-        print("  data/parsed.json               (productos A+B, usado por train_forecasting.py)")
-        print("  stock_data.json                (usado por milp_reorder.py y ga_transfers.py)")
-        print("  prices.json                    (usado por milp_reorder.py)")
-        print("  demand_statistics.json         (usado por milp_reorder.py)")
-        print("  warehouse_sale.json            (usado por ga_transfers.py)")
-        print("  warehouses.json                (usado por ga_transfers.py)")
+        print("  data/parsed.json              (series semanales productos A+B)")
+        print("  data/stock_data.json          (stock por producto y sucursal)")
+        print("  data/prices.json              (precio de venta promedio por producto)")
+        print("  data/demand_statistics.json   (media y desviacion de demanda semanal)")
+        print("  data/warehouse_sale.json      (ventas por sucursal - algoritmo genetico)")
+        print("  data/warehouses.json          (sucursales y rutas de transferencia)")
     finally:
         conn.close()
 

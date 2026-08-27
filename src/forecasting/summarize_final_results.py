@@ -9,10 +9,11 @@ Uso:
     python src/forecasting/summarize_final_results.py
 """
 from pathlib import Path
+
 import pandas as pd
-import numpy as np
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
+DATA_DIR = ROOT_DIR / "data"
 
 
 def summarize(path: Path, label: str):
@@ -33,6 +34,6 @@ def summarize(path: Path, label: str):
 
 
 if __name__ == "__main__":
-    summarize(ROOT_DIR / "model_comparison_results_A.csv", "Categoria A (comparacion completa)")
-    summarize(ROOT_DIR / "model_comparison_results_B.csv", "Categoria B (Holt-Winters)")
-    summarize(ROOT_DIR / "model_comparison_results_B_sample.csv", "Muestra B (comparacion completa, n=349)")
+    summarize(DATA_DIR / "model_comparison_results_A.csv", "Categoria A (comparacion completa)")
+    summarize(DATA_DIR / "model_comparison_results_B.csv", "Categoria B (Holt-Winters)")
+    summarize(DATA_DIR / "model_comparison_results_B_sample.csv", "Muestra B (comparacion completa, n=349)")

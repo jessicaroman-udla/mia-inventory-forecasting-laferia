@@ -1,6 +1,29 @@
+# --- Entornos y credenciales ---
 venv/
+.venv/
+.env
+
+# --- Python ---
 __pycache__/
 *.pyc
+
+# --- IDE / SO ---
 .DS_Store
-.env
-.idea
+.idea/
+.vscode/
+
+# --- Datos y resultados generados (NDA - Comercial La Feria) ---
+# Todo lo que produce el pipeline vive en data/ y NO se versiona.
+# Ver data/README.md para la descripcion de cada archivo.
+data/*
+!data/README.md
+
+# --- Logs ---
+*.log
+
+# --- Salidas de corridas antiguas que pudieran quedar fuera de data/ ---
+/shap_output/
+/intrinsic_output/
+/diagnostico_output/
+/grafico_*.png
+/*.jsonl

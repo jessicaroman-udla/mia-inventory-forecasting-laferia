@@ -28,30 +28,23 @@ Autor: Jessica Roman
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import optimizacion_milp_piloto as milp  # noqa: E402  (reutiliza el modulo real del pipeline)
 
-# optimizacion_milp_piloto.py referencia sus CSV de entrada (forecast_output.csv,
-# etc.) con rutas relativas al directorio raiz del repo (donde normalmente se
-# ejecuta el pipeline). Este script vive en src/optimization/, asi que se
-# corrigen esas rutas para que apunten a la raiz del repo sin importar desde
-# donde se invoque este archivo.
-_ROOT_DIR = Path(__file__).resolve().parents[2]
-milp.RUTA_CSV_PRONOSTICO = str(_ROOT_DIR / "forecast_output.csv")
-
 # ============================================================
 # CONFIGURACION DE LA PRUEBA
 # ============================================================
 
+DATA_DIR = milp.DATA_DIR
+
 MUESTRA_N = 300          # pares producto-sucursal en la muestra de la prueba
 SEED = 42                # misma semilla que el pipeline principal, para trazabilidad
 
-OUTPUT_RESUMEN_CSV = "robustness_sensitivity_leadtime_resumen.csv"
-OUTPUT_DETALLE_CSV = "robustness_sensitivity_leadtime_detalle.csv"
-OUTPUT_LOG_TXT = "robustness_sensitivity_leadtime_summary.txt"
+OUTPUT_RESUMEN_CSV = DATA_DIR / "robustness_sensitivity_leadtime_resumen.csv"
+OUTPUT_DETALLE_CSV = DATA_DIR / "robustness_sensitivity_leadtime_detalle.csv"
+OUTPUT_LOG_TXT = DATA_DIR / "robustness_sensitivity_leadtime_summary.txt"
 
 
 def preparar_dataset_muestra():
@@ -105,6 +98,7 @@ def resumir(resultado, status, etiqueta):
 
 def main():
     print(f"Preparando muestra de {MUESTRA_N} pares producto-sucursal (seed={SEED})...")
+    DATA_DIR.mkdir(exist_ok=True)
     df, capacidad_sucursal = preparar_dataset_muestra()
     print(f"Muestra final: {len(df)} pares producto-sucursal.")
 
@@ -131,7 +125,7 @@ def main():
     detalle = detalle.sort_values("diferencia_reorden", ascending=False)
     detalle.to_csv(OUTPUT_DETALLE_CSV, index=False)
 
-    with open(OUTPUT_LOG_TXT, "w") as f:
+    with open(OUTPUT_LOG_TXT, "w", encoding="utf-8") as f:
         f.write("ANEXO DE ROBUSTEZ - Prueba de sensibilidad: lead_time (MILP)\n")
         f.write(f"Muestra: {len(df)} pares producto-sucursal | seed={SEED}\n\n")
         f.write(comparacion.to_string(index=False))

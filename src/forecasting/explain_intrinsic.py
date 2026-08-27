@@ -41,9 +41,12 @@ import pandas as pd
 warnings.filterwarnings("ignore")
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-RESULTS_A_PATH = ROOT_DIR / "model_comparison_results_A.csv"
-OUTPUT_JSON = ROOT_DIR / "intrinsic_explanations.json"
-OUTPUT_CHARTS_DIR = ROOT_DIR / "intrinsic_output"
+DATA_DIR = ROOT_DIR / "data"
+PARSED_PATH = DATA_DIR / "parsed.json"
+RESULTS_A_PATH = DATA_DIR / "model_comparison_results_A.csv"
+RESULTS_B_PATH = DATA_DIR / "model_comparison_results_B.csv"
+OUTPUT_JSON = DATA_DIR / "intrinsic_explanations.json"
+OUTPUT_CHARTS_DIR = DATA_DIR / "intrinsic_output"
 
 TEST_WEEKS = 12
 
@@ -52,7 +55,7 @@ TEST_WEEKS = 12
 # Misma carga de datos que el resto del pipeline
 # ---------------------------------------------------------------
 def load_data():
-    with open(ROOT_DIR / "data" / "parsed.json", "r", encoding="utf-8") as f:
+    with open(PARSED_PATH, "r", encoding="utf-8") as f:
         raw = json.load(f)
     products = {}
     for row in raw["rows"]:
@@ -258,7 +261,7 @@ def select_codes(n_productos, codigos_arg, source="A"):
     if codigos_arg:
         return [c.strip() for c in codigos_arg.split(",") if c.strip()]
 
-    path = RESULTS_A_PATH if source == "A" else (ROOT_DIR / "model_comparison_results_B.csv")
+    path = RESULTS_A_PATH if source == "A" else RESULTS_B_PATH
     if not path.exists():
         raise SystemExit(
             f"No encuentro {path}. Corre primero train_forecasting_tiered.py "
@@ -285,7 +288,7 @@ def main():
     print(f"Productos a explicar ({len(codes)}): {codes}")
 
     products = load_data()
-    OUTPUT_CHARTS_DIR.mkdir(exist_ok=True)
+    OUTPUT_CHARTS_DIR.mkdir(parents=True, exist_ok=True)
 
     all_results = []
     for i, code in enumerate(codes, 1):

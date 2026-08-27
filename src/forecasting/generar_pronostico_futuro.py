@@ -35,10 +35,11 @@ from train_forecasting_tiered import (
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
+DATA_DIR = ROOT_DIR / "data"
 
-RESULTS_A_PATH = ROOT_DIR / "model_comparison_results_A.csv"
-RESULTS_B_PATH = ROOT_DIR / "model_comparison_results_B.csv"
-FUTURE_OUTPUT_PATH = ROOT_DIR / "pronostico_futuro_producto.csv"
+RESULTS_A_PATH = DATA_DIR / "model_comparison_results_A.csv"
+RESULTS_B_PATH = DATA_DIR / "model_comparison_results_B.csv"
+FUTURE_OUTPUT_PATH = DATA_DIR / "pronostico_futuro_producto.csv"
 
 HORIZON_WEEKS = 4  # ~30 dias, consistente con HORIZONTE_DIAS del MILP
 
@@ -101,6 +102,7 @@ def process_product_future(args):
 
 def main():
     print(f"Nucleos disponibles: {cpu_count()}  |  Workers a usar: {N_WORKERS}")
+    DATA_DIR.mkdir(exist_ok=True)
     products, category_by_code = load_data()
 
     resultados_a = pd.read_csv(RESULTS_A_PATH)[["product_code", "selected_model"]] \

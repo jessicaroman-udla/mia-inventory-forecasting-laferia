@@ -26,7 +26,10 @@ import pandas as pd
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
 
-load_dotenv()
+ROOT_DIR = Path(__file__).resolve().parents[2]
+DATA_DIR = ROOT_DIR / "data"
+
+load_dotenv(ROOT_DIR / ".env")
 
 DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
 DB_PORT = os.getenv("DB_PORT", "5432")
@@ -36,12 +39,11 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 ESQUEMA_BD = "inventario"
 
-ROOT_DIR = Path(__file__).resolve().parents[2] if "__file__" in dir() else Path(".")
-
-PRONOSTICO_PRODUCTO_PATH = ROOT_DIR / "pronostico_futuro_producto.csv"
-RESULTS_A_PATH = ROOT_DIR / "model_comparison_results_A.csv"
-RESULTS_B_PATH = ROOT_DIR / "model_comparison_results_B.csv"
-OUTPUT_PATH = ROOT_DIR / "forecast_output.csv"
+PRONOSTICO_PRODUCTO_PATH = DATA_DIR / "pronostico_futuro_producto.csv"
+RESULTS_A_PATH = DATA_DIR / "model_comparison_results_A.csv"
+RESULTS_B_PATH = DATA_DIR / "model_comparison_results_B.csv"
+OUTPUT_PATH = DATA_DIR / "forecast_output.csv"
+RECORTES_LOG_PATH = DATA_DIR / "pronosticos_recortados_log.csv"
 
 # Si una sucursal nunca vendio el producto en la ventana historica, no se
 # le asigna demanda proyectada (queda fuera del reparto, no en cero forzado).
@@ -107,6 +109,7 @@ def cargar_mape_por_producto():
 
 
 def main():
+    DATA_DIR.mkdir(exist_ok=True)
     engine = conectar()
 
     pronostico = pd.read_csv(PRONOSTICO_PRODUCTO_PATH)
@@ -140,8 +143,8 @@ def main():
         recortados_detalle = pronostico.loc[
             excede_tope, ["codigo_item", "demanda_pronosticada_total", "referencia_horizonte"]
         ].copy()
-        recortados_detalle.to_csv(ROOT_DIR / "pronosticos_recortados_log.csv", index=False)
-        print(f"  Detalle guardado en pronosticos_recortados_log.csv para revision.")
+        recortados_detalle.to_csv(RECORTES_LOG_PATH, index=False)
+        print(f"  Detalle guardado en {RECORTES_LOG_PATH} para revision.")
     pronostico.loc[excede_tope, "demanda_pronosticada_total"] = tope[excede_tope]
 
     df = pronostico.merge(participacion, on="codigo_item", how="inner")

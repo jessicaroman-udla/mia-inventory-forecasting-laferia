@@ -47,10 +47,13 @@ logging.getLogger("prophet").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore")
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
+DATA_DIR = ROOT_DIR / "data"
 
-RESULTS_A_PATH = ROOT_DIR / "model_comparison_results_A.csv"
-RESULTS_B_PATH = ROOT_DIR / "model_comparison_results_B.csv"
-PREDICTIONS_A_PATH = ROOT_DIR / "prediction_details_A.jsonl"
+PARSED_PATH = DATA_DIR / "parsed.json"
+ABC_PATH = DATA_DIR / "abc_classification.json"
+RESULTS_A_PATH = DATA_DIR / "model_comparison_results_A.csv"
+RESULTS_B_PATH = DATA_DIR / "model_comparison_results_B.csv"
+PREDICTIONS_A_PATH = DATA_DIR / "prediction_details_A.jsonl"
 
 TEST_WEEKS = 12
 
@@ -83,7 +86,7 @@ def mape(y_true, y_pred):
 # Carga de datos: parsed.json (series) + abc_classification.json (categoria)
 # ---------------------------------------------------------------
 def load_data():
-    with open(ROOT_DIR / "data" / "parsed.json", "r", encoding="utf-8") as f:
+    with open(PARSED_PATH, "r", encoding="utf-8") as f:
         raw = json.load(f)
 
     products = {}
@@ -99,7 +102,7 @@ def load_data():
             "series": df["units"].astype(float),
         }
 
-    with open(ROOT_DIR / "data" / "abc_classification.json", "r", encoding="utf-8") as f:
+    with open(ABC_PATH, "r", encoding="utf-8") as f:
         abc = json.load(f)
     category_by_code = {p["product_code"]: p["category"] for p in abc["products"]}
 
@@ -263,6 +266,7 @@ def append_row(csv_path: Path, row: dict):
 # ---------------------------------------------------------------
 def main():
     print(f"Nucleos disponibles: {cpu_count()}  |  Workers a usar: {N_WORKERS}")
+    DATA_DIR.mkdir(exist_ok=True)
     products, category_by_code = load_data()
 
     codes_A = [c for c in products if category_by_code.get(c) == "A"]

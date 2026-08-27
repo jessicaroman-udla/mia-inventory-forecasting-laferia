@@ -37,3 +37,4 @@ if __name__ == "__main__":
     summarize(DATA_DIR / "model_comparison_results_A.csv", "Categoria A (comparacion completa)")
     summarize(DATA_DIR / "model_comparison_results_B.csv", "Categoria B (Holt-Winters)")
     summarize(DATA_DIR / "model_comparison_results_B_sample.csv", "Muestra B (comparacion completa, n=349)")
+    summarize(DATA_DIR / "model_comparison_results_baseline.csv", "Baseline Naive (A+B, ver src/baseline/)")

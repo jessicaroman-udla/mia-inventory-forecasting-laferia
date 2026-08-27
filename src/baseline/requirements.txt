@@ -1,0 +1,5 @@
+# El baseline reutiliza data/parsed.json y las funciones de
+# src/forecasting/train_forecasting_tiered.py, asi que NO necesita base de datos.
+# Estas dependencias ya estan en el requirements.txt de la raiz del proyecto.
+pandas>=2.0.0
+numpy>=1.24.0

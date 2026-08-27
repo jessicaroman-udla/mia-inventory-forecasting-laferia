@@ -1,196 +1,167 @@
 """
 baseline_naive.py
 
-Modelo baseline (Naive Forecast) para el proyecto MIA - Comercial La Feria.
-Punto de referencia mínimo frente al cual se evalúa si los modelos propuestos
-(ARIMA, Prophet, LSTM, Holt-Winters) mejoran una estrategia simple de pronóstico.
+Modelo baseline para el proyecto MIA - Comercial La Feria.
+Punto de referencia minimo frente al cual se evalua si los modelos propuestos
+(ARIMA, Prophet, LSTM, Holt-Winters) mejoran una estrategia trivial.
 
-Lógica del baseline:
-    Demanda pronosticada (semana t) = Demanda observada en la última semana
-    disponible del conjunto de entrenamiento (naive / random walk sin
-    tendencia ni estacionalidad).
+IMPORTANTE - comparabilidad:
+    Este script reutiliza EXACTAMENTE la misma preparacion de datos y las
+    mismas metricas que train_forecasting_tiered.py (importa load_data,
+    split_series, mae, rmse, mape y TEST_WEEKS de ese modulo). Asi las
+    cifras del baseline son directamente comparables con
+    model_comparison_results_A.csv / _B.csv:
+      - misma serie semanal nacional por producto (data/parsed.json)
+      - misma reindexacion a semanas continuas W-MON con huecos = 0
+      - misma particion cronologica (ultimas TEST_WEEKS = 12 semanas = test)
+      - misma clasificacion ABC (data/abc_classification.json)
+      - MAPE calculado solo sobre semanas con demanda real > 0
 
-Requiere:
-    - Conexión de solo lectura a la base PostgreSQL del proyecto (esquema `inventario`).
-    - Variables de entorno definidas en un archivo `.env` (ver .env.example).
+Dos baselines:
+    Naive (random walk):   pronostico = ultimo valor observado en train.
+    Seasonal naive:         pronostico(semana t) = valor de la semana t-52
+                            (misma semana del anio anterior). Solo se calcula
+                            si la serie tiene >= 52 + TEST_WEEKS semanas.
 
-Salida:
-    - resultados_baseline_detalle.csv   -> métricas por producto-sucursal
-    - resultados_baseline_resumen.csv   -> medianas por categoría ABC (A/B/C)
-    - Impresión en consola del resumen final
+Entrada:  data/parsed.json, data/abc_classification.json
+Salida:   data/model_comparison_results_baseline.csv   (detalle por producto)
+          data/model_comparison_results_baseline_resumen.csv  (mediana por categoria)
 
-Uso:
-    python baseline_naive.py
+Uso (rapido, sin base de datos):
+    python src/baseline/baseline_naive.py
 """
-
-import os
 import sys
-from datetime import date, timedelta
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
 
-# ---------------------------------------------------------------------------
-# 1. Configuración: carga de variables de entorno
-# ---------------------------------------------------------------------------
-load_dotenv()
-
-DB_USER = os.environ.get("DB_USER")
-DB_PASSWORD = os.environ.get("DB_PASSWORD")
-DB_HOST = os.environ.get("DB_HOST", "localhost")
-DB_PORT = os.environ.get("DB_PORT", "5432")
-DB_NAME = os.environ.get("DB_NAME")
-
-if not all([DB_USER, DB_PASSWORD, DB_NAME]):
-    sys.exit(
-        "ERROR: faltan variables de entorno. Verifica que exista un archivo .env "
-        "con DB_USER, DB_PASSWORD y DB_NAME definidos (ver .env.example)."
-    )
-
-# Parámetros del experimento (ajusta si tu partición temporal cambia)
-SEMANAS_TEST = int(os.environ.get("BASELINE_SEMANAS_TEST", 12))  # ventana de prueba, en semanas
-ARCHIVO_DETALLE = "resultados_baseline_detalle.csv"
-ARCHIVO_RESUMEN = "resultados_baseline_resumen.csv"
-
-# ---------------------------------------------------------------------------
-# 2. Conexión a la base de datos
-# ---------------------------------------------------------------------------
-engine = create_engine(
-    f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+# Reutiliza la logica del pipeline principal (mismo directorio que
+# train_forecasting.py / _tiered.py).
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "forecasting"))
+from train_forecasting_tiered import (  # noqa: E402
+    DATA_DIR,
+    TEST_WEEKS,
+    load_data,
+    split_series,
+    mae,
+    rmse,
+    mape,
 )
 
-print("Conectando a la base de datos...")
-with engine.connect() as conn:
-    fecha_min, fecha_max = conn.execute(
-        text(
-            """
-            SELECT MIN(fecha), MAX(fecha)
-            FROM inventario.ventas
-            WHERE tipo = 'Factura'
-            """
-        )
-    ).one()
+OUTPUT_DETALLE = DATA_DIR / "model_comparison_results_baseline.csv"
+OUTPUT_RESUMEN = DATA_DIR / "model_comparison_results_baseline_resumen.csv"
 
-print(f"Rango de fechas disponible en 'ventas': {fecha_min} a {fecha_max}")
-
-# Ventana total de trabajo: se replica el criterio de 13-14 meses del proyecto,
-# usando la fecha máxima disponible como ancla.
-fecha_max_d = fecha_max if isinstance(fecha_max, date) else fecha_max.date()
-inicio_ventana = fecha_max_d - timedelta(days=14 * 30)  # aprox. 14 meses
-fecha_corte_test = fecha_max_d - timedelta(weeks=SEMANAS_TEST)
-
-print(f"Ventana de trabajo: {inicio_ventana} a {fecha_max_d}")
-print(f"Corte train/test (ventana de prueba = {SEMANAS_TEST} semanas): {fecha_corte_test}")
-
-# ---------------------------------------------------------------------------
-# 3. Extracción de ventas semanales agregadas por producto-sucursal
-# ---------------------------------------------------------------------------
-query_ventas = text(
-    """
-    SELECT codigo_item, almacen, date_trunc('week', fecha)::date AS semana,
-           SUM(cantidad) AS demanda
-    FROM inventario.ventas
-    WHERE tipo = 'Factura'
-      AND fecha BETWEEN :inicio AND :fin
-    GROUP BY codigo_item, almacen, date_trunc('week', fecha)
-    ORDER BY codigo_item, almacen, semana
-    """
-)
-
-print("Extrayendo ventas semanales agregadas (puede tardar unos segundos)...")
-df = pd.read_sql(query_ventas, engine, params={"inicio": inicio_ventana, "fin": fecha_max_d})
-df["semana"] = pd.to_datetime(df["semana"])
-print(f"Registros semana-producto-sucursal extraídos: {len(df):,}")
-
-# ---------------------------------------------------------------------------
-# 4. Extracción de la clasificación ABC vigente (para reportar por categoría)
-# ---------------------------------------------------------------------------
-query_clasificacion = text(
-    """
-    SELECT DISTINCT ON (item_code) item_code, clasificacion_abc
-    FROM inventario.analisis_avanzado
-    WHERE clasificacion_abc IS NOT NULL
-    ORDER BY item_code, fecha_analisis DESC
-    """
-)
-df_clas = pd.read_sql(query_clasificacion, engine)
-print(f"Productos con clasificación ABC vigente: {len(df_clas):,}")
-
-# ---------------------------------------------------------------------------
-# 5. Partición train/test y cálculo del pronóstico naive
-# ---------------------------------------------------------------------------
-corte = pd.Timestamp(fecha_corte_test)
-df_train = df[df["semana"] < corte]
-df_test = df[df["semana"] >= corte]
-
-# Último valor observado en train, por producto-sucursal
-ultimo_train = (
-    df_train.sort_values("semana")
-    .groupby(["codigo_item", "almacen"], as_index=False)
-    .last()[["codigo_item", "almacen", "demanda"]]
-    .rename(columns={"demanda": "naive_pred"})
-)
-
-comparacion = df_test.merge(ultimo_train, on=["codigo_item", "almacen"], how="inner")
-print(f"Series producto-sucursal evaluadas (con historial en train y observación en test): "
-      f"{comparacion[['codigo_item', 'almacen']].drop_duplicates().shape[0]:,}")
+CATEGORIES = ("A", "B")  # las mismas que forecastea el pipeline principal
+SEASONAL_PERIOD = 52     # semanas
 
 
-# ---------------------------------------------------------------------------
-# 6. Cálculo de métricas (MAE, RMSE, MAPE) por producto-sucursal
-# ---------------------------------------------------------------------------
-def calcular_metricas(grupo: pd.DataFrame) -> pd.Series:
-    real = grupo["demanda"].values
-    pred = grupo["naive_pred"].values
-    mae = np.mean(np.abs(real - pred))
-    rmse = np.sqrt(np.mean((real - pred) ** 2))
-    mask = real != 0
-    mape = np.mean(np.abs((real[mask] - pred[mask]) / real[mask])) * 100 if mask.any() else np.nan
-    return pd.Series({"MAE": mae, "RMSE": rmse, "MAPE": mape})
+def naive_forecast(train: pd.Series, horizon: int) -> np.ndarray:
+    """Random walk: repite el ultimo valor observado en train."""
+    return np.full(horizon, float(train.iloc[-1]))
 
 
-print("Calculando métricas por producto-sucursal...")
-por_producto = (
-    comparacion.groupby(["codigo_item", "almacen"])
-    .apply(calcular_metricas)
-    .reset_index()
-)
+def seasonal_naive_forecast(series: pd.Series, horizon: int) -> np.ndarray | None:
+    """Valor de la misma semana del anio anterior (t - 52)."""
+    if len(series) < SEASONAL_PERIOD + horizon:
+        return None
+    # test = series[-horizon:]  ->  para el punto -horizon+k se usa -horizon+k-52
+    ref = series.iloc[-horizon - SEASONAL_PERIOD: -SEASONAL_PERIOD]
+    return np.clip(ref.values.astype(float), 0, None)
 
-# Cruce con clasificación ABC
-por_producto = por_producto.merge(
-    df_clas, left_on="codigo_item", right_on="item_code", how="left"
-)
-por_producto["clasificacion_abc"] = por_producto["clasificacion_abc"].fillna("Sin clasificar")
 
-# ---------------------------------------------------------------------------
-# 7. Resumen por categoría (mediana, igual convención que el resto del proyecto)
-# ---------------------------------------------------------------------------
-resumen = (
-    por_producto.groupby("clasificacion_abc")
-    .agg(
-        n_series=("MAE", "count"),
-        MAE_mediana=("MAE", "median"),
-        RMSE_mediana=("RMSE", "median"),
-        MAPE_mediana=("MAPE", "median"),
-    )
-    .reset_index()
-    .sort_values("clasificacion_abc")
-)
+def evaluate_product(code: str, name: str, series: pd.Series, category: str) -> dict:
+    train, test = split_series(series)
+    horizon = len(test)
+    y_true = test.values
 
-# ---------------------------------------------------------------------------
-# 8. Guardar resultados y mostrar resumen
-# ---------------------------------------------------------------------------
-por_producto.to_csv(ARCHIVO_DETALLE, index=False)
-resumen.to_csv(ARCHIVO_RESUMEN, index=False)
+    row = {
+        "product_code": code,
+        "product_name": name,
+        "category": category,
+        "n_train": len(train),
+        "n_test": horizon,
+    }
 
-print("\n" + "=" * 60)
-print("RESUMEN - Modelo baseline (Naive Forecast)")
-print("=" * 60)
-print(resumen.to_string(index=False))
-print("\nArchivos generados:")
-print(f"  - {ARCHIVO_DETALLE}  (detalle por producto-sucursal)")
-print(f"  - {ARCHIVO_RESUMEN}  (medianas por categoría ABC)")
-print("\nUsa estos valores para reemplazar los [pendiente] en la sección")
-print("'D. Modelo baseline' del documento de tesis.")
+    pred_naive = naive_forecast(train, horizon)
+    row["Naive_MAE"] = mae(y_true, pred_naive)
+    row["Naive_RMSE"] = rmse(y_true, pred_naive)
+    row["Naive_MAPE"] = mape(y_true, pred_naive)
+
+    pred_snaive = seasonal_naive_forecast(series, horizon)
+    if pred_snaive is not None:
+        row["SeasonalNaive_MAE"] = mae(y_true, pred_snaive)
+        row["SeasonalNaive_RMSE"] = rmse(y_true, pred_snaive)
+        row["SeasonalNaive_MAPE"] = mape(y_true, pred_snaive)
+    else:
+        row["SeasonalNaive_MAE"] = np.nan
+        row["SeasonalNaive_RMSE"] = np.nan
+        row["SeasonalNaive_MAPE"] = np.nan
+
+    # Compatibilidad con summarize_final_results.py
+    row["selected_model"] = "Naive"
+    row["best_mape"] = row["Naive_MAPE"]
+    return row
+
+
+def resumir(df: pd.DataFrame) -> pd.DataFrame:
+    filas = []
+    for cat in CATEGORIES:
+        sub = df[df["category"] == cat]
+        if sub.empty:
+            continue
+        for modelo in ("Naive", "SeasonalNaive"):
+            m = sub[f"{modelo}_MAPE"].dropna()
+            filas.append({
+                "categoria": cat,
+                "modelo": modelo,
+                "n_series": len(sub),
+                "n_mape_valido": len(m),
+                "MAE_mediana": round(sub[f"{modelo}_MAE"].median(), 2),
+                "RMSE_mediana": round(sub[f"{modelo}_RMSE"].median(), 2),
+                "MAPE_mediana": round(m.median(), 2) if len(m) else np.nan,
+                "MAPE_media": round(m.mean(), 2) if len(m) else np.nan,
+                "pct_MAPE_bajo_15": round(100 * (m < 15).mean(), 1) if len(m) else np.nan,
+            })
+    return pd.DataFrame(filas)
+
+
+def main():
+    print("Cargando datos (data/parsed.json + data/abc_classification.json)...")
+    products, category_by_code = load_data()
+
+    seleccion = [
+        (c, info) for c, info in products.items()
+        if category_by_code.get(c) in CATEGORIES
+    ]
+    print(f"Productos A+B a evaluar: {len(seleccion)}  |  ventana de prueba: {TEST_WEEKS} semanas")
+
+    filas = []
+    for i, (code, info) in enumerate(seleccion, 1):
+        serie = info["series"]
+        if len(serie) <= TEST_WEEKS + 1:
+            continue
+        filas.append(evaluate_product(code, info["name"], serie, category_by_code[code]))
+        if i % 500 == 0:
+            print(f"  {i}/{len(seleccion)}")
+
+    df = pd.DataFrame(filas)
+    DATA_DIR.mkdir(exist_ok=True)
+    df.to_csv(OUTPUT_DETALLE, index=False)
+
+    resumen = resumir(df)
+    resumen.to_csv(OUTPUT_RESUMEN, index=False)
+
+    print("\n" + "=" * 72)
+    print("RESUMEN - Modelo baseline (mediana por categoria ABC)")
+    print("=" * 72)
+    print(resumen.to_string(index=False))
+    print(f"\nDetalle:  {OUTPUT_DETALLE}")
+    print(f"Resumen:  {OUTPUT_RESUMEN}")
+    print("\nComparar 'MAPE_mediana' de Naive/SeasonalNaive contra la mediana de "
+          "best_mape en\nmodel_comparison_results_A.csv / _B.csv "
+          "(usar src/forecasting/summarize_final_results.py).")
+
+
+if __name__ == "__main__":
+    main()

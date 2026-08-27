@@ -1,52 +1,46 @@
-# Modelo baseline (Naive Forecast) — MIA, Comercial La Feria
+# Modelo baseline — MIA, Comercial La Feria
 
-Script de referencia para calcular el modelo baseline exigido por el checklist
-de tesis (sección D), comparable contra ARIMA/Prophet/LSTM/Holt-Winters.
+Baseline de referencia (sección D del checklist de tesis), comparable 1:1
+contra ARIMA / Prophet / LSTM / Holt-Winters.
 
-## Instrucciones de ejecución
+## Qué calcula
 
-1. Instalar dependencias (idealmente en un entorno virtual):
+Sobre **exactamente los mismos datos y la misma metodología** que
+`src/forecasting/train_forecasting_tiered.py` (importa `load_data`,
+`split_series`, `mae`, `rmse`, `mape`, `TEST_WEEKS` de ese módulo):
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+| Baseline | Definición |
+|---|---|
+| **Naive** (random walk) | pronóstico = último valor observado en el train |
+| **Seasonal naive** | pronóstico(semana *t*) = valor de la semana *t − 52* (misma semana del año anterior); solo si la serie tiene ≥ 64 semanas |
 
-2. Configurar credenciales de conexión:
+- Serie semanal **nacional por producto** (`data/parsed.json`), reindexada a
+  semanas continuas con huecos = 0.
+- Partición cronológica: últimas `TEST_WEEKS` (= 12) semanas como test.
+- Clasificación ABC de `data/abc_classification.json`.
+- MAPE solo sobre semanas con demanda real > 0.
+- Categorías A y B (las que forecastea el pipeline principal).
 
-   ```bash
-   cp .env.example .env
-   ```
+## Ejecución
 
-   Editar `.env` y completar `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`,
-   `DB_PASSWORD` con los mismos valores que usa el proyecto Django
-   (ver `settings.py` → `DATABASES`).
+No necesita base de datos (usa los JSON ya extraídos). Corre en ~20 s.
 
-3. Ejecutar el script:
+```bash
+python src/baseline/baseline_naive.py
+```
 
-   ```bash
-   python baseline_naive.py
-   ```
+## Salidas (en `data/`)
 
-4. Revisar los resultados generados:
+- `model_comparison_results_baseline.csv` — detalle por producto (MAE/RMSE/MAPE
+  de Naive y Seasonal naive; mismo esquema que `model_comparison_results_A.csv`).
+- `model_comparison_results_baseline_resumen.csv` — mediana por categoría ABC.
 
-   - `resultados_baseline_detalle.csv` — métricas (MAE, RMSE, MAPE) por
-     combinación producto-sucursal.
-   - `resultados_baseline_resumen.csv` — medianas agregadas por categoría
-     ABC (A, B, C), listas para insertar en la Tabla de comparación
-     baseline vs. modelo propuesto del documento de tesis.
+Para la tabla de la tesis, comparar `MAPE_mediana` del baseline contra la
+mediana de `best_mape` en `model_comparison_results_A.csv` / `_B.csv`
+(`python src/forecasting/summarize_final_results.py`).
 
-## Parámetros ajustables
+## Reproducibilidad
 
-- `BASELINE_SEMANAS_TEST` (en `.env`, por defecto 12): tamaño de la ventana
-  de prueba, en semanas. Debe coincidir con la ventana usada al evaluar
-  ARIMA/Prophet/LSTM/Holt-Winters para que la comparación sea válida.
-
-## Notas de reproducibilidad
-
-- El script es de solo lectura sobre la base de datos (no modifica ni
-  inserta registros).
-- La clasificación ABC se toma del snapshot más reciente disponible en
-  `inventario.analisis_avanzado`; si esta tabla se actualiza, los resultados
-  pueden variar levemente respecto a corridas anteriores.
-- Semilla aleatoria: no aplica (el naive forecast es determinístico, no
-  requiere semilla).
+- Determinístico (el naive no usa semilla).
+- Los resultados dependen de la corrida de `extract_data.py` que generó
+  `data/parsed.json` y `data/abc_classification.json`.

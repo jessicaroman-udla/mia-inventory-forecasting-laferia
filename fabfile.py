@@ -5,10 +5,11 @@ Requisitos en tu maquina local:
     pip install fabric
 
 Requisito previo (una sola vez): autenticacion SSH por llave configurada
-hacia el servidor (ver instrucciones aparte: ssh-keygen + ssh-copy-id).
+hacia el servidor (ssh-keygen + ssh-copy-id).
 
-CONFIGURACION: ajusta las 3 variables de abajo (HOST, USER, PROJECT_DIR)
-antes de usar.
+CONFIGURACION: los datos del servidor se leen del archivo .env
+(DEPLOY_HOST, DEPLOY_PORT, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_PROJECT_DIR).
+Ver .env.example.
 
 USO (desde tu maquina local, parado en la carpeta del proyecto):
     fab deploy      # git pull + instala dependencias nuevas en el servidor
@@ -19,26 +20,36 @@ USO (desde tu maquina local, parado en la carpeta del proyecto):
     fab stop        # detiene la sesion de entrenamiento
 """
 import os
+from pathlib import Path
 
+from dotenv import load_dotenv
 from fabric import Connection, task
 
+load_dotenv(Path(__file__).resolve().parent / ".env")
+
 # =================================================================
-# CONFIGURACION - AJUSTA ESTO
+# CONFIGURACION - se lee de .env (ver .env.example)
 # =================================================================
-HOST = "186.4.222.67"
-PORT = 12980
-USER = "udla"
-SSH_KEY = os.path.expanduser("~/.ssh/id_ed25519_github_udla")  # ajusta si tu llave tiene otro nombre/ruta
-PROJECT_DIR = "~/mia-inventory-forecasting-laferia"
+HOST = os.getenv("DEPLOY_HOST", "")
+PORT = int(os.getenv("DEPLOY_PORT", "22"))
+USER = os.getenv("DEPLOY_USER", "")
+SSH_KEY = os.path.expanduser(os.getenv("DEPLOY_SSH_KEY", "~/.ssh/id_ed25519"))
+PROJECT_DIR = os.getenv("DEPLOY_PROJECT_DIR", "~/mia-inventory-forecasting-laferia")
 VENV_ACTIVATE = f"source {PROJECT_DIR}/venv/bin/activate"
 TMUX_SESSION = "forecasting"
-LOG_FILE = f"{PROJECT_DIR}/training.log"
+LOG_DIR = f"{PROJECT_DIR}/data/logs"
+LOG_FILE = f"{LOG_DIR}/training.log"
 
 
 # =================================================================
 
 
 def get_connection():
+    if not HOST or not USER:
+        raise SystemExit(
+            "Faltan datos del servidor. Copia .env.example como .env y completa "
+            "DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY y DEPLOY_PROJECT_DIR."
+        )
     return Connection(
         host=HOST,
         user=USER,
@@ -79,6 +90,7 @@ def train(c):
         return
 
     with conn.cd(PROJECT_DIR):
+        conn.run(f"mkdir -p {LOG_DIR}")
         cmd = (
             f"tmux new-session -d -s {TMUX_SESSION} "
             f"\"{VENV_ACTIVATE} && python -u src/forecasting/train_forecasting_tiered.py "
@@ -125,15 +137,16 @@ def stop(c):
 def validate_b(c):
     """Corre la comparacion completa de modelos sobre una muestra de categoria B, en tmux."""
     conn = get_connection()
-    existing = conn.run(f"tmux has-session -t validate_b", warn=True, hide=True)
+    existing = conn.run("tmux has-session -t validate_b", warn=True, hide=True)
     if existing.ok:
         print("Ya existe una sesion 'validate_b' corriendo.")
         return
     with conn.cd(PROJECT_DIR):
+        conn.run(f"mkdir -p {LOG_DIR}")
         cmd = (
             f"tmux new-session -d -s validate_b "
             f"\"{VENV_ACTIVATE} && python -u src/forecasting/validate_b_sample.py "
-            f"2>&1 | tee validate_b.log\""
+            f"2>&1 | tee {LOG_DIR}/validate_b.log\""
         )
         conn.run(cmd)
     print("Validacion lanzada en tmux (sesion 'validate_b').")
@@ -143,14 +156,14 @@ def validate_b(c):
 def status_validate_b(c):
     """Muestra si el entrenamiento sigue corriendo y las ultimas lineas relevantes del log."""
     conn = get_connection()
-    result = conn.run(f"tmux has-session -t validate_b", warn=True, hide=True)
+    result = conn.run("tmux has-session -t validate_b", warn=True, hide=True)
     if result.ok:
-        print(f"[EN CURSO] La sesion 'validate_b' sigue activa.\n")
+        print("[EN CURSO] La sesion 'validate_b' sigue activa.\n")
     else:
-        print(f"[NO ACTIVA] No hay una sesion 'validate_b' corriendo (termino o no se ha lanzado).\n")
+        print("[NO ACTIVA] No hay una sesion 'validate_b' corriendo (termino o no se ha lanzado).\n")
 
     with conn.cd(PROJECT_DIR):
-        conn.run(f"grep -v 'cmdstanpy' validate_b.log | tail -n 20", warn=True)
+        conn.run(f"grep -v 'cmdstanpy' {LOG_DIR}/validate_b.log | tail -n 20", warn=True)
 
 
 @task
@@ -175,10 +188,11 @@ def explain_shap(c, n=15, codigos=None):
         extra_args = f"--n-productos {n}"
 
     with conn.cd(PROJECT_DIR):
+        conn.run(f"mkdir -p {LOG_DIR}")
         cmd = (
             f"tmux new-session -d -s {session} "
             f"\"{VENV_ACTIVATE} && python -u src/forecasting/explain_shap_lstm.py {extra_args} "
-            f"2>&1 | tee shap_lstm.log\""
+            f"2>&1 | tee {LOG_DIR}/shap_lstm.log\""
         )
         conn.run(cmd)
     print(f"SHAP sobre LSTM lanzado en tmux (sesion '{session}'). Usa 'fab status-explain-shap' para ver el progreso.")
@@ -196,4 +210,4 @@ def status_explain_shap(c):
         print(f"[NO ACTIVA] No hay una sesion '{session}' corriendo (termino o no se ha lanzado).\n")
 
     with conn.cd(PROJECT_DIR):
-        conn.run(f"tail -n 30 shap_lstm.log", warn=True)
+        conn.run(f"tail -n 30 {LOG_DIR}/shap_lstm.log", warn=True)

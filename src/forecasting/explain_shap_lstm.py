@@ -38,9 +38,11 @@ import pandas as pd
 warnings.filterwarnings("ignore")
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-RESULTS_A_PATH = ROOT_DIR / "model_comparison_results_A.csv"
-OUTPUT_JSON = ROOT_DIR / "shap_lstm_results.json"
-OUTPUT_CHARTS_DIR = ROOT_DIR / "shap_output"
+DATA_DIR = ROOT_DIR / "data"
+PARSED_PATH = DATA_DIR / "parsed.json"
+RESULTS_A_PATH = DATA_DIR / "model_comparison_results_A.csv"
+OUTPUT_JSON = DATA_DIR / "shap_lstm_results.json"
+OUTPUT_CHARTS_DIR = DATA_DIR / "shap_output"
 
 # Deben coincidir exactamente con fit_lstm() en train_forecasting_tiered.py
 WINDOW = 8
@@ -52,7 +54,7 @@ TEST_WEEKS = 12
 # Misma carga de datos que el pipeline principal
 # ---------------------------------------------------------------
 def load_data():
-    with open(ROOT_DIR / "data" / "parsed.json", "r", encoding="utf-8") as f:
+    with open(PARSED_PATH, "r", encoding="utf-8") as f:
         raw = json.load(f)
     products = {}
     for row in raw["rows"]:
@@ -230,7 +232,7 @@ def main():
     print(f"Productos a explicar ({len(codes)}): {codes}")
 
     products = load_data()
-    OUTPUT_CHARTS_DIR.mkdir(exist_ok=True)
+    OUTPUT_CHARTS_DIR.mkdir(parents=True, exist_ok=True)
 
     results = []
     for i, code in enumerate(codes, 1):

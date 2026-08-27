@@ -27,38 +27,29 @@ import argparse
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
+DATA_DIR = ROOT_DIR / "data"
 
-# Nombre real, confirmado desde validate_b_sample.py (RESULTS_SAMPLE_PATH)
-DEFAULT_SAMPLE_CANDIDATES = [
-    "model_comparison_results_B_sample.csv",
-]
+DEFAULT_SAMPLE_CSV = "model_comparison_results_B_sample.csv"
+
+
+def _resolve(path_str: str) -> Path:
+    """Resuelve un nombre de archivo contra data/ (o lo toma tal cual si es absoluto)."""
+    p = Path(path_str)
+    return p if p.is_absolute() else DATA_DIR / p
 
 
 def find_sample_csv(explicit_path: str | None) -> Path:
-    if explicit_path:
-        p = ROOT_DIR / explicit_path
-        if not p.exists():
-            sys.exit(f"No encuentro {p}. Verifica el nombre con:\n"
-                      f"  ls -lt {ROOT_DIR}/*.csv | head -5")
-        return p
-
-    for name in DEFAULT_SAMPLE_CANDIDATES:
-        p = ROOT_DIR / name
-        if p.exists():
-            return p
-
-    sys.exit(
-        "No encontre el CSV de la muestra automaticamente. Pasa el nombre exacto con "
-        "--sample-csv, por ejemplo:\n"
-        "  python src/forecasting/compare_b_significance.py --sample-csv mi_archivo.csv\n\n"
-        "Para verlo en el servidor:\n"
-        "  ssh -p 12980 -i ~/.ssh/id_ed25519_github_udla udla@186.4.222.67 "
-        "\"ls -lt ~/mia-inventory-forecasting-laferia/*.csv | head -5\""
-    )
+    p = _resolve(explicit_path or DEFAULT_SAMPLE_CSV)
+    if not p.exists():
+        sys.exit(
+            f"No encuentro {p}.\n"
+            f"Pasa el nombre exacto con --sample-csv (se busca dentro de data/), p. ej.:\n"
+            f"  python src/forecasting/compare_b_significance.py --sample-csv mi_archivo.csv"
+        )
+    return p
 
 
 def main():
@@ -72,7 +63,7 @@ def main():
     args = parser.parse_args()
 
     sample_path = find_sample_csv(args.sample_csv)
-    full_b_path = ROOT_DIR / args.full_b_csv
+    full_b_path = _resolve(args.full_b_csv)
     if not full_b_path.exists():
         sys.exit(f"No encuentro {full_b_path}.")
 
@@ -152,7 +143,7 @@ def main():
     print("Diferencia estadisticamente significativa (p<0.05)"
           if p_value < 0.05 else "NO hay diferencia estadisticamente significativa (p>=0.05)")
 
-    out_path = ROOT_DIR / "b_significance_comparison.csv"
+    out_path = DATA_DIR / "b_significance_comparison.csv"
     merged.to_csv(out_path, index=False)
     print(f"\nDetalle guardado en: {out_path}")
 

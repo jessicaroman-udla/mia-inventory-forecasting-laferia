@@ -39,11 +39,12 @@ from pathlib import Path
 # (src/forecasting/). ROOT_DIR replica exactamente
 # Path(__file__).resolve().parents[2] de train_forecasting.py.
 ROOT_DIR = Path(__file__).resolve().parents[2]
+DATA_DIR = ROOT_DIR / "data"
 
 # ============================================================
 # CARGA DE DATOS (idéntica a train_forecasting.py)
 # ============================================================
-def load_products(root_dir: Path) -> dict:
+def load_products(root_dir: Path = ROOT_DIR) -> dict:
     data_path = root_dir / "data" / "parsed.json"
     with open(data_path, "r", encoding="utf-8") as f:
         raw = json.load(f)
@@ -70,7 +71,7 @@ PRODUCTOS_PROBLEMATICOS = {
     "A102012-0019": "REAL TINAPA EN SALSA TOMATE AF 156GR",
 }
 
-OUTPUT_DIR = "diagnostico_output"
+OUTPUT_DIR = DATA_DIR / "diagnostico_output"
 
 
 def compute_stats(serie: pd.Series) -> dict:
@@ -171,7 +172,7 @@ def diagnosticar_train_test():
     """
     products = load_products(ROOT_DIR)
 
-    with open(ROOT_DIR / "prediction_details.json", "r", encoding="utf-8") as f:
+    with open(DATA_DIR / "prediction_details.json", "r", encoding="utf-8") as f:
         pred_details = json.load(f)
 
     resumen = []
@@ -191,7 +192,7 @@ def diagnosticar_train_test():
         test = serie.iloc[-n_test:]
 
         media_train, std_train = train.mean(), train.std()
-        media_test, std_test = test.mean(), test.std()
+        media_test = test.mean()
         shift_sigmas = (media_test - media_train) / std_train if std_train > 0 else np.nan
 
         stats = {

@@ -33,15 +33,17 @@ random.seed(42)
 np.random.seed(42)
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
+DATA_DIR = ROOT_DIR / "data"
+OUTPUT_PATH = DATA_DIR / "resultado_ga_transferencias.json"
 
 # ---------------------------------------------------------------
 # 1. Carga de datos
 # ---------------------------------------------------------------
-with open(ROOT_DIR / "stock_data.json", encoding="utf-8") as f:
+with open(DATA_DIR / "stock_data.json", encoding="utf-8") as f:
     stock = json.load(f)
-with open(ROOT_DIR / "warehouse_sale.json", encoding="utf-8") as f:
+with open(DATA_DIR / "warehouse_sale.json", encoding="utf-8") as f:
     sales_by_warehouse = json.load(f)
-with open(ROOT_DIR / "warehouses.json", encoding="utf-8") as f:
+with open(DATA_DIR / "warehouses.json", encoding="utf-8") as f:
     warehouses_info = json.load(f)
 
 WAREHOUSES = [w["code"] for w in warehouses_info]
@@ -193,27 +195,30 @@ def optimize_product_transfers(product):
 # ---------------------------------------------------------------
 # 5. Ejecutar para todos los productos
 # ---------------------------------------------------------------
-results = []
-for product in stock.keys():
-    print(f"\nOptimizing transfers for {product} ...")
-    r = optimize_product_transfers(product)
-    results.append(r)
-    if r["transfer_plan"]:
-        print(f"  Suggested plan ({len(r['transfer_plan'])} transfers):")
-        for t in r["transfer_plan"]:
-            print(f"    {t['origin']} -> {t['destination']}: {t['quantity']:,.0f} units")
-    else:
-        print("  No transfers needed (inventory already balanced)")
+def main():
+    DATA_DIR.mkdir(exist_ok=True)
+    results = []
+    for product in stock.keys():
+        print(f"\nOptimizing transfers for {product} ...")
+        r = optimize_product_transfers(product)
+        results.append(r)
+        if r["transfer_plan"]:
+            print(f"  Suggested plan ({len(r['transfer_plan'])} transfers):")
+            for t in r["transfer_plan"]:
+                print(f"    {t['origin']} -> {t['destination']}: {t['quantity']:,.0f} units")
+        else:
+            print("  No transfers needed (inventory already balanced)")
 
-with open(ROOT_DIR / "resultado_ga_transferencias.json", "w", encoding="utf-8") as f:
-    json.dump(results, f, ensure_ascii=False, indent=2)
+    with open(OUTPUT_PATH, "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
 
-# ---------------------------------------------------------------
-# 6. Resumen
-# ---------------------------------------------------------------
-total_transfers = sum(len(r["transfer_plan"]) for r in results)
-products_with_transfer = sum(1 for r in results if r["transfer_plan"])
-print("\n" + "=" * 80)
-print(f"SUMMARY: {products_with_transfer} of {len(results)} products require transfers")
-print(f"Total suggested movements: {total_transfers}")
-print(f"Result saved to {ROOT_DIR / 'resultado_ga_transferencias.json'}")
+    total_transfers = sum(len(r["transfer_plan"]) for r in results)
+    products_with_transfer = sum(1 for r in results if r["transfer_plan"])
+    print("\n" + "=" * 80)
+    print(f"SUMMARY: {products_with_transfer} of {len(results)} products require transfers")
+    print(f"Total suggested movements: {total_transfers}")
+    print(f"Result saved to {OUTPUT_PATH}")
+
+
+if __name__ == "__main__":
+    main()

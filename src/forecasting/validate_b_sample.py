@@ -41,14 +41,14 @@ from train_forecasting_tiered import (
     process_product_A,
     load_done_codes,
     append_row,
-    ROOT_DIR,
+    DATA_DIR,
 )
 
 SAMPLE_SIZE = 349
 RANDOM_SEED = 42  # fijo para reproducibilidad -- documentar en la tesis
 
-RESULTS_SAMPLE_PATH = ROOT_DIR / "model_comparison_results_B_sample.csv"
-PREDICTIONS_SAMPLE_PATH = ROOT_DIR / "prediction_details_B_sample.jsonl"
+RESULTS_SAMPLE_PATH = DATA_DIR / "model_comparison_results_B_sample.csv"
+PREDICTIONS_SAMPLE_PATH = DATA_DIR / "prediction_details_B_sample.jsonl"
 
 N_WORKERS = max(1, cpu_count() - 1)
 

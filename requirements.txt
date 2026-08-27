@@ -1,16 +1,32 @@
-deap
-fabric
-matplotlib
+# Proyecto MIA - Sistema inteligente de gestion de inventarios (Comercial La Feria)
+# Python 3.10 - 3.12 (TensorFlow aun no soporta bien 3.13)
+# Instalacion:  pip install -r requirements.txt
+
+# --- Datos / base de datos ---
+psycopg2-binary
+sqlalchemy
+python-dotenv
+
+# --- Computo numerico ---
 numpy
 pandas
+scipy
+
+# --- Forecasting ---
 pmdarima
 prophet
-psycopg2-binary
-psycopg2-binary 
-pulp
-pulp 
-python-dotenv
-shap
-sqlalchemy 
 statsmodels
 tensorflow-cpu
+
+# --- Explicabilidad ---
+shap
+
+# --- Optimizacion ---
+pulp
+deap
+
+# --- Visualizacion ---
+matplotlib
+
+# --- Deploy / ejecucion remota ---
+fabric

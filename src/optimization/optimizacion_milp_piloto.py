@@ -12,6 +12,8 @@ Autor: Jessica Roman
 """
 
 import os
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 from sqlalchemy import create_engine, text
@@ -22,7 +24,10 @@ from pulp import LpProblem, LpMinimize, LpVariable, LpInteger, LpBinary, lpSum, 
 # CONFIGURACIÓN
 # ============================================================
 
-load_dotenv()
+ROOT_DIR = Path(__file__).resolve().parents[2]
+DATA_DIR = ROOT_DIR / "data"
+
+load_dotenv(ROOT_DIR / ".env")
 
 DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
 DB_PORT = os.getenv("DB_PORT", "5432")
@@ -39,7 +44,7 @@ TABLA_PRONOSTICO = "forecast_output"
 # Columnas esperadas: codigo_item, almacen, categoria, modelo_ganador,
 # demanda_pronosticada, mape
 USAR_CSV_PRONOSTICO = True
-RUTA_CSV_PRONOSTICO = "forecast_output.csv"  # <-- AJUSTAR a tu archivo real
+RUTA_CSV_PRONOSTICO = str(DATA_DIR / "forecast_output.csv")  # salida de desagregar_por_sucursal.py
 
 # Filtros del piloto: reducir alcance antes de correr sobre todo el catálogo
 PILOTO_CATEGORIA = None  # None = A+B juntas; o "A"/"B" para una sola
@@ -54,7 +59,7 @@ Z_SCORE_95 = 1.645                 # z para 95% de nivel de servicio (normal est
 HORIZONTE_DIAS = 30                # horizonte de planificación del piloto
 CAPACIDAD_BUFFER = 1.5             # margen de holgura sobre el stock total actual
 
-OUTPUT_CSV = "resultados_milp_piloto.csv"
+OUTPUT_CSV = str(DATA_DIR / "resultados_milp_piloto.csv")
 
 # --- AJUSTAR si tus tablas viven bajo otro esquema (ya vimos que ventas
 # está en 'inventario.'); confirma stock_global y productos también. ---
@@ -120,7 +125,7 @@ def cargar_datos(engine):
         engine,
     )
 
-    print(f"Cargando pronóstico...")
+    print("Cargando pronóstico...")
     if USAR_CSV_PRONOSTICO:
         try:
             pronostico = pd.read_csv(RUTA_CSV_PRONOSTICO)
@@ -329,6 +334,7 @@ def resolver_milp(df, capacidad_sucursal):
 # ============================================================
 
 def main():
+    DATA_DIR.mkdir(exist_ok=True)
     engine = conectar()
     stock, productos, costos, sigma_hist, pronostico = cargar_datos(engine)
 

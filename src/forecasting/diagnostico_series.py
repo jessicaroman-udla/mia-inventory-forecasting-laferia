@@ -27,13 +27,13 @@ Así la serie diagnosticada es 100% la misma que ve el modelo.
 
 import json
 import os
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import matplotlib
 matplotlib.use("Agg")  # para correr sin entorno gráfico
 import matplotlib.pyplot as plt
-
-from pathlib import Path
 
 # Coloca este script en la misma carpeta que train_forecasting.py
 # (src/forecasting/). ROOT_DIR replica exactamente

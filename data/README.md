@@ -12,6 +12,9 @@ principal).
 
 ## Entradas (las genera `src/extraction/extract_data.py` desde PostgreSQL)
 
+> Sin acceso a la base de datos, `src/sample_data/generate_sample.py` escribe
+> estos mismos archivos con datos **sintéticos** de ejemplo.
+
 | Archivo | Contenido |
 |---|---|
 | `abc_classification.json` | Clasificación ABC (Pareto 80/95) de todo el catálogo vendido |
@@ -30,11 +33,13 @@ principal).
 | `model_comparison_results_A.csv`, `_B.csv`, `prediction_details_A.jsonl` | `train_forecasting_tiered.py` |
 | `model_comparison_results_B_sample.csv`, `prediction_details_B_sample.jsonl` | `validate_b_sample.py` |
 | `b_significance_comparison.csv` | `compare_b_significance.py` |
+| `model_comparison_results_baseline.csv`, `model_comparison_results_baseline_resumen.csv` | `src/baseline/baseline_naive.py` |
+| `metrics_extra_detalle.csv`, `metrics_extra_resumen.csv` | `metrics_extra.py` (sMAPE / WAPE / MASE) |
 | `pronostico_futuro_producto.csv` | `generar_pronostico_futuro.py` |
 | `shap_lstm_results.json`, `shap_output/` | `explain_shap_lstm.py` |
 | `intrinsic_explanations.json`, `intrinsic_output/` | `explain_intrinsic.py` |
 | `diagnostico_output/` | `diagnostico_series.py` |
-| `charts/` (`.png`) | `generate_charts.py` |
+| `charts/` (`.png`) | `generate_charts.py`, `plot_real_vs_pred.py` |
 
 ## Salidas de optimización (`src/optimization/`)
 

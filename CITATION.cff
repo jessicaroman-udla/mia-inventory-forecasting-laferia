@@ -1,0 +1,43 @@
+cff-version: 1.2.0
+message: "Si usa este software o sus resultados, por favor cite el trabajo de titulación."
+title: "Sistema Inteligente de Gestión de Inventarios con Forecasting Multi-Sucursal — Comercial La Feria"
+abstract: >-
+  Prototipo de línea de comandos que integra modelos de forecasting de demanda
+  (ARIMA, Prophet, LSTM, Holt-Winters) y optimización matemática (MILP con PuLP
+  y algoritmo genético con DEAP) para automatizar la gestión de inventarios y
+  las transferencias inter-sucursales de Comercial La Feria (Santo Domingo de
+  los Tsáchilas, Ecuador).
+type: software
+version: "0.1.0"
+date-released: "2026-08-31"
+license: LicenseRef-Academic-Use
+repository-code: "https://github.com/jessicaroman-udla/mia-inventory-forecasting-laferia"
+keywords:
+  - forecasting de demanda
+  - gestión de inventarios
+  - optimización MILP
+  - algoritmo genético
+  - clasificación ABC
+  - LSTM
+authors:
+  - family-names: "Lam Cheang"
+    given-names: "Wiliam David"
+    affiliation: "Universidad de Las Américas (UDLA), Ecuador"
+  - family-names: "Román Largo"
+    given-names: "Jessica Johanna"
+    affiliation: "Universidad de Las Américas (UDLA), Ecuador"
+contact:
+  - family-names: "Román Largo"
+    given-names: "Jessica Johanna"
+references:
+  - type: thesis
+    title: "Sistema Inteligente de Gestión de Inventarios con Forecasting Multi-Sucursal para Comercial La Feria"
+    authors:
+      - family-names: "Lam Cheang"
+        given-names: "Wiliam David"
+      - family-names: "Román Largo"
+        given-names: "Jessica Johanna"
+    institution:
+      name: "Universidad de Las Américas (UDLA) — Facultad de Ingeniería y Ciencias Aplicadas"
+    year: 2026
+    notes: "Trabajo de titulación, Maestría en Inteligencia Artificial Aplicada. Tutor: Criollo Caizaguano Luis Santiago."

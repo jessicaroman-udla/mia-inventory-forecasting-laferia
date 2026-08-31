@@ -21,18 +21,17 @@ USO EN SERVIDOR (puede tardar, igual que el entrenamiento original):
 """
 import json
 import time
-from pathlib import Path
+import warnings
 from multiprocessing import Pool, cpu_count
+from pathlib import Path
+
+warnings.filterwarnings("ignore")
 
 import numpy as np
 import pandas as pd
-import warnings
-warnings.filterwarnings("ignore")
-
-from train_forecasting_tiered import (
-    fit_arima, fit_prophet, fit_lstm, load_data,
-)
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
+
+from train_forecasting_tiered import fit_arima, fit_prophet, fit_lstm, load_data
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = ROOT_DIR / "data"

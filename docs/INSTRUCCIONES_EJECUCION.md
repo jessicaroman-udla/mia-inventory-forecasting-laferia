@@ -165,14 +165,28 @@ Todo queda en la carpeta **`data/`**:
 
 ---
 
+## 5b. (Opcional) Baseline y métricas complementarias
+
+Sobre el mismo dataset de ejemplo, sin base de datos:
+
+```bash
+python src/baseline/baseline_naive.py       # Naive / Seasonal naive → data/model_comparison_results_baseline*.csv
+```
+
+El baseline usa exactamente la misma partición y métricas que el pipeline
+principal, así que sus cifras son comparables 1:1 con
+`data/model_comparison_results.csv`. Ver `src/baseline/README_baseline.md`.
+
+---
+
 ## 6. (Opcional) Ejecución con datos reales
 
 Con acceso a la base PostgreSQL de Comercial La Feria:
 
 ```bash
 cp .env.example .env        # completar DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
-python src/extraction/extract_data.py      # reemplaza el paso 3 (genera data/*.json desde la BD)
-# luego los pasos 1, 2, 4, 5 igual que arriba
+python src/extraction/extract_data.py      # sustituye a la sección 3 (genera data/*.json desde la BD)
+# luego los pasos 1 a 5 de la sección 4, igual que arriba
 ```
 
 Para el catálogo completo (miles de productos) en un servidor, usar

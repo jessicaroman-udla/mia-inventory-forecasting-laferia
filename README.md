@@ -86,19 +86,28 @@ Hoy existen como prototipo los dos módulos centrales (`src/forecasting/`,
 mia-inventory-forecasting-laferia/
 │
 ├── src/
+│   ├── sample_data/
+│   │   └── generate_sample.py             # dataset sintético de ejemplo (corre el pipeline SIN base de datos)
 │   ├── extraction/
-│   │   └── extract_data.py                # PostgreSQL → clasificación ABC + JSON de entrada
+│   │   ├── extract_data.py                # PostgreSQL → clasificación ABC + JSON de entrada
+│   │   └── stats_dataset.py               # resumen descriptivo y de calidad de `inventario.ventas` (solo lectura)
 │   ├── forecasting/
 │   │   ├── train_forecasting.py           # [referencia] ARIMA/Prophet/LSTM sobre todo parsed.json
 │   │   ├── train_forecasting_tiered.py    # [principal] A: 3 modelos · B: Holt-Winters · paralelo + checkpoint
 │   │   ├── validate_b_sample.py           # valida la estrategia B sobre una muestra (n=349)
 │   │   ├── compare_b_significance.py      # prueba de Wilcoxon: 3 modelos vs Holt-Winters
 │   │   ├── summarize_final_results.py     # mediana/percentiles de MAPE de A y B
+│   │   ├── metrics_extra.py               # métricas adicionales (sMAPE, WAPE, MASE) sobre resultados ya generados
 │   │   ├── generar_pronostico_futuro.py   # pronóstico FUTURO real (no backtest)
 │   │   ├── explain_shap_lstm.py           # explicabilidad post-hoc del LSTM (SHAP)
 │   │   ├── explain_intrinsic.py           # explicabilidad intrínseca ARIMA/Prophet/Holt-Winters
 │   │   ├── diagnostico_series.py          # diagnóstico de productos con MAPE alto
-│   │   └── generate_charts.py             # gráficos de comparación de modelos
+│   │   ├── generate_charts.py             # gráficos de comparación de modelos
+│   │   ├── plot_real_vs_pred.py           # gráfico real vs. predicho sobre el conjunto de prueba
+│   │   └── plot_shap_thesis.py            # re-dibuja los gráficos SHAP en alta resolución para la tesis
+│   ├── baseline/
+│   │   ├── baseline_naive.py              # baseline Naive / Seasonal naive (mismos datos y métricas que el pipeline)
+│   │   └── README_baseline.md
 │   └── optimization/
 │       ├── milp_reorder.py                # [referencia] MILP sobre 15 productos A (sin BD)
 │       ├── desagregar_por_sucursal.py     # pronóstico nacional → demanda por producto-sucursal
@@ -110,9 +119,16 @@ mia-inventory-forecasting-laferia/
 ├── data/                    # TODO lo generado (entradas y resultados) — NO se versiona (NDA)
 │   └── README.md            # descripción de cada archivo que vive aquí
 │
+├── docs/
+│   ├── INSTRUCCIONES_EJECUCION.md   # guía reproducible paso a paso SIN base de datos ni credenciales
+│   └── img/                         # capturas de ejemplo para la documentación
+│
 ├── fabfile.py               # deploy + ejecución remota del pipeline (Fabric)
 ├── requirements.txt
 ├── .env.example             # plantilla de variables de entorno
+├── LICENSE                  # licencia de uso académico
+├── CITATION.cff             # cómo citar el trabajo
+├── AUTHORS.md               # autores y responsabilidades
 └── README.md
 ```
 
@@ -135,7 +151,8 @@ El mismo paso (forecasting, MILP) tiene dos implementaciones según la escala:
 | Paralelo / checkpointing | no | sí (`multiprocessing`, reanudable) |
 | Para qué sirve | leer y entender la metodología | generar los resultados de la tesis |
 
-El algoritmo genético (`ga_transfers.py`) es común a ambos tracks.
+El algoritmo genético (`ga_transfers.py`) y el baseline
+(`src/baseline/baseline_naive.py`) son comunes a ambos tracks.
 
 ---
 
@@ -185,6 +202,12 @@ de vuelta al ERP** (solo lectura de SAP HANA).
 
 ## 🚀 Cómo ejecutar el prototipo
 
+> **¿Solo quieres reproducir los resultados sin acceso a la base de datos?**
+> Sigue [`docs/INSTRUCCIONES_EJECUCION.md`](docs/INSTRUCCIONES_EJECUCION.md): usa
+> un dataset sintético (`src/sample_data/generate_sample.py`) y corre el
+> pipeline completo sin PostgreSQL ni credenciales. El resto de esta sección
+> describe la ejecución con datos reales.
+
 ### 1. Requisitos
 
 Python **3.10, 3.11 o 3.12** (TensorFlow aún no soporta bien 3.13).
@@ -230,12 +253,16 @@ python src/optimization/optimizacion_milp_piloto.py     # → data/resultados_mi
 python src/optimization/ga_transfers.py                 # → data/resultado_ga_transferencias.json
 ```
 
-Pasos opcionales de validación / explicabilidad / robustez:
+Pasos opcionales de baseline / validación / explicabilidad / robustez:
 
 ```bash
+python src/baseline/baseline_naive.py                   # baseline Naive / Seasonal naive (sin BD)
+python src/forecasting/metrics_extra.py                 # sMAPE, WAPE y MASE sobre los resultados ya generados
+python src/forecasting/plot_real_vs_pred.py             # gráfico real vs. predicho del conjunto de prueba
 python src/forecasting/validate_b_sample.py
 python src/forecasting/compare_b_significance.py
 python src/forecasting/explain_shap_lstm.py
+python src/forecasting/plot_shap_thesis.py              # re-dibuja los SHAP en alta resolución (no recalcula)
 python src/forecasting/explain_intrinsic.py --source A
 python src/forecasting/diagnostico_series.py
 python src/optimization/robustness_sensitivity_leadtime.py
@@ -248,6 +275,8 @@ Todo queda dentro de **`data/`** (ver `data/README.md` para el detalle):
 | Archivo | Qué contiene |
 |---|---|
 | `data/model_comparison_results_A.csv` / `_B.csv` | MAPE por producto y modelo seleccionado |
+| `data/model_comparison_results_baseline*.csv` | MAE/RMSE/MAPE de Naive y Seasonal naive (detalle + resumen) |
+| `data/metrics_extra_detalle.csv` / `_resumen.csv` | sMAPE, WAPE y MASE por producto y agregados |
 | `data/pronostico_futuro_producto.csv` | demanda proyectada por producto |
 | `data/resultados_milp_piloto.csv` | punto de reorden y cantidad a ordenar por producto-sucursal |
 | `data/resultado_ga_transferencias.json` | plan de transferencias entre sucursales |
@@ -303,6 +332,16 @@ el flujo SSH + `tmux`. Los datos del servidor se leen de `.env`
 - **Forecasting:** MAE, RMSE y **MAPE** (objetivo < 15 % en categoría A). La
   **mediana** de MAPE es la métrica de reporte (no la media), por el sesgo de
   la demanda intermitente.
+- **Métricas complementarias** (`metrics_extra.py`): sMAPE, WAPE y MASE
+  (Hyndman & Koehler, 2006), calculadas sobre los resultados ya generados sin
+  reentrenar.
+- **Baseline** (`src/baseline/baseline_naive.py`): Naive (random walk) y
+  Seasonal naive, sobre exactamente los mismos datos, partición y métricas que
+  el pipeline principal. Es el punto de referencia mínimo contra el que se
+  contrasta si ARIMA/Prophet/LSTM/Holt-Winters aportan mejora
+  (ver `src/baseline/README_baseline.md`).
+- **Significancia estadística** (`compare_b_significance.py`): prueba de
+  Wilcoxon pareada para la estrategia diferenciada A/B.
 - **Usabilidad (UAT, pendiente):** SUS ≥ 68, 5 usuarios, 2 sesiones.
 - **KPIs operativos (piloto, pendiente):** reducción de rupturas ≥ 30 %,
   reducción de tiempo de decisión ≥ 50 %.
@@ -325,7 +364,9 @@ a revisión: `git add -f data/<archivo>`.
 
 Uso académico exclusivo (trabajo de titulación, Maestría en Inteligencia
 Artificial Aplicada). Los datos pertenecen a Comercial La Feria; el código es
-propiedad intelectual de los autores y la universidad.
+propiedad intelectual de los autores y la universidad. Ver [`LICENSE`](LICENSE).
+
+Para citar este trabajo, ver [`CITATION.cff`](CITATION.cff).
 
 ---
 

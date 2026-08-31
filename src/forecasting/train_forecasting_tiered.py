@@ -31,19 +31,18 @@ Requisitos adicionales sobre los que ya tenias:
     ya lo tienes instalado porque pmdarima depende de statsmodels)
 """
 import json
+import logging
 import os
 import time
 import warnings
-from pathlib import Path
 from multiprocessing import Pool, cpu_count
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import logging
 
 logging.getLogger("cmdstanpy").setLevel(logging.ERROR)
 logging.getLogger("prophet").setLevel(logging.ERROR)
-
 warnings.filterwarnings("ignore")
 
 ROOT_DIR = Path(__file__).resolve().parents[2]

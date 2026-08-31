@@ -1,0 +1,39 @@
+Licencia de uso académico
+=========================
+
+Copyright (c) 2026
+    Lam Cheang Wiliam David
+    Román Largo Jessica Johanna
+    Universidad de Las Américas (UDLA) — Facultad de Ingeniería y Ciencias Aplicadas
+    Maestría en Inteligencia Artificial Aplicada
+
+Este repositorio contiene el código del trabajo de titulación "Sistema
+Inteligente de Gestión de Inventarios con Forecasting Multi-Sucursal" para
+Comercial La Feria HLS Cía. Ltda.
+
+1. Uso permitido
+   Se permite consultar, ejecutar y reproducir este código con fines
+   exclusivamente académicos y de evaluación del trabajo de titulación
+   (revisión por el tutor, tribunal y personal de la universidad), así como
+   para estudio personal y docencia.
+
+2. Restricciones
+   - No se autoriza el uso comercial del código sin permiso escrito de los
+     autores y de la universidad.
+   - No se autoriza la redistribución pública de versiones modificadas sin
+     atribución a los autores originales.
+
+3. Datos
+   Los datos de Comercial La Feria HLS Cía. Ltda. NO forman parte de este
+   repositorio y están protegidos por un Acuerdo de Confidencialidad (NDA).
+   Su tratamiento se rige por la Ley Orgánica de Protección de Datos
+   Personales (LOPDP) del Ecuador. El dataset de ejemplo incluido en
+   `src/sample_data/` es sintético y no guarda relación con datos reales.
+
+4. Sin garantía
+   El código se entrega "tal cual", sin garantía de ningún tipo, expresa o
+   implícita. Los autores y la universidad no se hacen responsables de daños
+   derivados de su uso.
+
+5. Atribución
+   Cualquier uso académico debe citar el trabajo. Ver `CITATION.cff`.
